@@ -41,7 +41,6 @@
 
         html,
         body {
-            height: 100%;
             margin: 0;
             font-family: Inter, system-ui, sans-serif;
             background: var(--bg-color);
@@ -52,8 +51,18 @@
         .wrap {
             display: flex;
             flex-direction: column;
-            height: 100%;
         }
+
+        html,
+        body,
+        .wrap {
+            min-height: 100vh;
+            /* Fill at least the full screen */
+            height: auto;
+            /* But expand beyond if needed */
+            background: var(--bg-color);
+        }
+
 
         header {
             padding: 16px;
@@ -94,7 +103,7 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             margin-bottom: 14px;
         }
@@ -108,16 +117,10 @@
         }
 
         .prayer.current {
-            outline: 4px solid var(--highlight-outline);
+            outline: 3px solid #f7d65c;
+            box-shadow: 0 0 12px 2px rgba(247, 214, 92, 0.6);
             background: var(--accent-bg);
-        }
-
-        .prayer.sunrise {
-            background: var(--shuruq-bg);
-            color: var(--shuruq-text);
-            border: 2px solid var(--shuruq-border);
-            box-shadow: 0 0 12px var(--shuruq-border);
-            transition: all 0.8s ease;
+            transition: all 0.5s ease;
         }
 
         .name {
@@ -189,23 +192,25 @@
                 </div>
             </div>
             <div style="font-size:1.8rem;font-weight:600;" id="liveClock">--:--:--</div>
-            <!-- <button id="themeToggle" style="background:none;border:1px solid var(--subtext-color);color:var(--text-color);
+            <button id="themeToggle" style="background:none;border:1px solid var(--subtext-color);color:var(--text-color);
   padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.9rem;">
                 Toggle Theme
-            </button> -->
+            </button>
         </header>
 
         <main>
             <div class="card">
-                <div class="grid" id="prayerGrid">
-                    <!-- prayer cards injected here -->
-                </div>
+                <div id="nextMessage" style="
+  text-align:center;
+  font-size:1.4rem;
+  font-weight:600;
+  margin-bottom:14px;
+  margin-top:6px;
+"></div>
 
-                <!-- Countdown Section -->
-                <div class="countdown">
-                    <div class="cd-left" id="nextLabel">Next:</div>
-                    <div class="cd-time" id="countdown">--:--:--</div>
-                </div>
+                <div class="grid" id="prayerGrid"></div>
+
+
                 <!-- 🕌 Announcements Section -->
                 <div id="announcements" style="margin:10px 0; padding:12px; text-align:center; border-radius:8px;
     background:rgba(255,255,255,0.04); font-size:1.05rem; line-height:1.5;">
@@ -236,16 +241,27 @@
         let iqamaTimes = {};
         let prayerOrder = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
+        // === Time Override for Testing ===
+        // Change this to simulate different times.
+        // Example: simulate 5:55 AM to test Fajr, or Friday 12:20 PM to test Jumuah.
+
+        let TEST_TIME = null;
+        // Example format: "2025-10-10T05:55:00"  (set to null for real-time)
+
+        function getNow() {
+            return TEST_TIME ? new Date(TEST_TIME) : new Date();
+        }
+
         async function fetchTimings() {
             try {
-                const today = new Date();
+                const today = getNow();
                 const timestamp = Math.floor(today.getTime() / 1000);
                 const url = `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${LAT}&longitude=${LON}&method=${calcMethod}`;
                 const res = await fetch(url);
                 const json = await res.json();
                 if (json && json.data && json.data.timings) {
                     timingsToday = json.data.timings;
-                    document.getElementById('dateLine').textContent = new Date().toLocaleString();
+                    document.getElementById('dateLine').textContent = getNow().toLocaleString();
                     computeIqamaTimes();
                     renderGrid();
                     autoThemeBasedOnSun();
@@ -261,7 +277,7 @@
         function parseTimeToDate(timeStr) {
             const t = timeStr.split(' ')[0];
             const [hh, mm] = t.split(':').map(Number);
-            const d = new Date();
+            const d = getNow();
             d.setHours(hh, mm, 0, 0);
             return d;
         }
@@ -293,86 +309,132 @@
         }
 
         function setSpecificTime(hours24, minutes) {
-            const d = new Date();
+            const d = getNow();
             d.setHours(hours24, minutes, 0, 0);
             return d;
         }
 
         function renderGrid() {
-            const grid = document.getElementById('prayerGrid');
-            grid.innerHTML = '';
-            const now = new Date();
-            let currentPrayer = null;
+            const grid = document.getElementById("prayerGrid");
+            grid.innerHTML = "";
 
-            for (let i = 0; i < prayerOrder.length; i++) {
-                const p = prayerOrder[i];
-                const iq = iqamaTimes[p];
-                if (!iq) continue;
+            const now = getNow();
+            const day = now.getDay(); // 0=Sun ... 5=Fri
 
-                const nextIq = (() => {
-                    for (let j = i + 1; j < prayerOrder.length; j++) {
-                        if (iqamaTimes[prayerOrder[j]]) return iqamaTimes[prayerOrder[j]];
-                    }
-                    return new Date(iq.getTime() + 24 * 3600 * 1000);
-                })();
+            // Build the prayer list including Shuruq
+            let prayers = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
-                if (now >= iq && now < nextIq) {
-                    currentPrayer = p;
+            // On Fridays, inject Jumuah slots instead of Dhuhr
+            if (day === 5) {
+                prayers = ['Fajr', 'Sunrise', 'Jumuah 1', 'Jumuah 2', 'Jumuah 3', 'Asr', 'Maghrib', 'Isha'];
+            }
+
+            const nowMs = now.getTime();
+            const events = [];
+
+            // Build event list with actual Date objects
+            for (const p of prayers) {
+                if (p.startsWith("Jumuah")) {
+                    // Three fixed Friday slots
+                    const index = parseInt(p.split(" ")[1]);
+                    const times = [
+                        { hour: 11, minute: 30, madhhab: "Hanafi" },
+                        { hour: 12, minute: 30, madhhab: "Hanafi" },
+                        { hour: 13, minute: 30, madhhab: "Jaffari" },
+                    ];
+                    const info = times[index - 1];
+                    const d = getNow();
+                    d.setHours(info.hour, info.minute, 0, 0);
+                    events.push({ name: p, adhan: d, madhhab: info.madhhab });
+                } else if (p === "Sunrise") {
+                    const t = parseTimeToDate(timingsToday["Sunrise"]);
+                    events.push({ name: "Sunrise", adhan: t });
+                } else {
+                    const adhan = parseTimeToDate(timingsToday[p]);
+                    const iq = iqamaTimes[p];
+                    events.push({ name: p, adhan, iqama: iq });
                 }
             }
 
-            for (const p of prayerOrder) {
-                const adhan = timingsToday[p] ? parseTimeToDate(timingsToday[p]) : null;
-                const adhanStr = adhan ? formatTime12(adhan) : '--:--';
-                const iqDate = iqamaTimes[p];
-                const iqStr = iqDate ? formatTime12(iqDate) : '';
+            // Determine next upcoming event
+            const upcoming = events
+                .filter(e => {
+                    // If it has iqama, use that; otherwise fall back to adhan (e.g. Shuruq, Jumuah)
+                    const t = e.iqama || e.adhan;
+                    return t && t.getTime() > nowMs;
+                })
+                .sort((a, b) => {
+                    const ta = a.iqama ? a.iqama.getTime() : a.adhan.getTime();
+                    const tb = b.iqama ? b.iqama.getTime() : b.adhan.getTime();
+                    return ta - tb;
+                })[0];
 
-                const div = document.createElement('div');
-                div.className = 'prayer' + (p === currentPrayer ? ' current' : '') + (p === 'Sunrise' ? ' sunrise' : '');
 
-                // 🕊️ For Sunrise (Shuruq), show only time — no iqama line
-                if (p === 'Sunrise') {
+            // Create all prayer cards
+            for (const e of events) {
+                const adhanStr = e.adhan ? formatTime12(e.adhan) : "--:--";
+                const div = document.createElement("div");
+
+                // Base card classes
+                div.className = "prayer";
+                if (upcoming && e.name === upcoming.name) div.classList.add("current");
+
+                // Build card content
+                if (e.name.startsWith("Jumuah")) {
                     div.innerHTML = `
-      <div class="name">Shuruq</div>
-      <div class="time">${adhanStr}</div>
-    `;
+        <div class="name">${e.name}</div>
+        <div class="time">${adhanStr}</div>
+        <div class="iqama">${e.madhhab}</div>
+      `;
+                } else if (e.name === "Sunrise") {
+                    div.innerHTML = `
+        <div class="name">Shuruq</div>
+        <div class="time">${adhanStr}</div>
+      `;
                 } else {
+                    const iqStr = e.iqama ? formatTime12(e.iqama) : "--:--";
                     div.innerHTML = `
-      <div class="name">${p}</div>
-      <div class="time">${adhanStr}</div>
-      <div class="iqama">Iqama: ${iqStr}</div>
-    `;
+        <div class="name">${e.name}</div>
+        <div class="time">${adhanStr}</div>
+        <div class="iqama">Iqama: ${iqStr}</div>
+      `;
                 }
 
                 grid.appendChild(div);
             }
-            updateCountdown();
+
+            updateCountdown(upcoming);
         }
 
-        function updateCountdown() {
-            const now = new Date();
-            const futureIqamas = Object.entries(iqamaTimes)
-                .map(([p, d]) => ({ p, time: d }))
-                .filter(x => x.time.getTime() > now.getTime())
-                .sort((a, b) => a.time - b.time);
+        function updateCountdown(upcoming) {
+            const nextMsg = document.getElementById("nextMessage");
+            const now = getNow();
 
-            let next = null;
-            if (futureIqamas.length > 0) next = futureIqamas[0];
-            else if (iqamaTimes['Fajr'])
-                next = { p: 'Fajr', time: new Date(iqamaTimes['Fajr'].getTime() + 24 * 3600 * 1000) };
-
-            if (!next) {
-                document.getElementById('nextLabel').textContent = 'Next: ---';
-                document.getElementById('countdown').textContent = '--:--:--';
+            if (!upcoming || (!upcoming.iqama && !upcoming.adhan)) {
+                nextMsg.textContent = "No more prayers today.";
+                document.getElementById("countdown").textContent = "--:--:--";
                 return;
             }
-            document.getElementById('nextLabel').textContent = `Next: ${next.p} (${formatTime12(next.time)})`;
-            const diffMs = next.time - now;
+
+            // Countdown
+            const diffMs = (upcoming.iqama || upcoming.adhan) - now;
             const h = Math.floor(diffMs / 3600000);
             const m = Math.floor((diffMs % 3600000) / 60000);
             const s = Math.floor((diffMs % 60000) / 1000);
-            document.getElementById('countdown').textContent =
-                `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            const countdown = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+
+            // Update top message
+            if (upcoming.name === "Sunrise") {
+                nextMsg.textContent = `🌅 Sunrise is at ${formatTime12(upcoming.adhan)} — in ${countdown}`;
+            } else if (upcoming.name.startsWith("Jumuah")) {
+                nextMsg.textContent = `🕌 The next Jumuah (${upcoming.name}) is in ${countdown}`;
+            } else {
+                nextMsg.textContent = `🕒 The next prayer of ${upcoming.name} (Iqama) is in ${countdown}`;
+            }
+
+            // Also update bottom countdown bar
+            document.getElementById("nextLabel").textContent = `Next: ${upcoming.name} (${formatTime12(upcoming.iqama || upcoming.adhan)})`;
+            document.getElementById("countdown").textContent = countdown;
         }
 
         fetchTimings();
@@ -380,7 +442,7 @@
         setInterval(() => renderGrid(), 1000);
 
         function updateLiveClock() {
-            const now = new Date();
+            const now = getNow();
             const timeString = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
             document.getElementById('liveClock').textContent = timeString;
             document.getElementById('dateLine').textContent = now.toLocaleDateString(undefined, {
@@ -415,7 +477,7 @@
         // Automatic mode based on prayer times
         function autoThemeBasedOnSun() {
             if (!timingsToday["Fajr"] || !timingsToday["Maghrib"]) return;
-            const now = new Date();
+            const now = getNow();
             const fajr = parseTimeToDate(timingsToday["Fajr"]);
             const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
 
