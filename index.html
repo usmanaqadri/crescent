@@ -433,7 +433,7 @@
             }
 
             // Determine next upcoming event
-            const upcoming = events
+            let upcoming = events
                 .filter(e => {
                     // If it has iqama, use that; otherwise fall back to adhan (e.g. Shuruq, Jumuah)
                     const t = e.iqama || e.adhan;
@@ -445,6 +445,17 @@
                     return ta - tb;
                 })[0];
 
+            // If no upcoming events today, use tomorrow's Fajr
+            if (!upcoming) {
+                const fajrEvent = events.find(e => e.name === "Fajr");
+                if (fajrEvent) {
+                    upcoming = {
+                        name: "Fajr",
+                        adhan: new Date(fajrEvent.adhan.getTime() + 24 * 3600 * 1000),
+                        iqama: fajrEvent.iqama ? new Date(fajrEvent.iqama.getTime() + 24 * 3600 * 1000) : null
+                    };
+                }
+            }
 
             // Create all prayer cards
             for (const e of events) {
@@ -546,15 +557,22 @@
                 }
             }
 
-            // === Smooth fade transition ===
-            if (nextMsg.innerHTML !== message) {
+            // Determine current phase key (for comparison)
+            const currentPhaseKey = phaseClass + "-" + upcoming.name;
+
+            // If the phase changed (not just countdown ticking), fade
+            if (nextMsg.dataset.phase !== currentPhaseKey) {
                 nextMsg.classList.add("fade-out");
                 setTimeout(() => {
                     nextMsg.innerHTML = message;
-                    nextMsg.className = ""; // remove old phases & fade
+                    nextMsg.className = "";
                     nextMsg.classList.add(phaseClass);
+                    nextMsg.dataset.phase = currentPhaseKey;
                 }, 300);
                 setTimeout(() => nextMsg.classList.remove("fade-out"), 400);
+            } else {
+                // Same phase — just update countdown text without fading
+                nextMsg.innerHTML = message;
             }
 
             // === Bottom countdown bar ===
