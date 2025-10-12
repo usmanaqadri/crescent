@@ -81,6 +81,52 @@
             font-size: 0.95rem;
         }
 
+        /* --- Fade & Background Phases --- */
+        #nextMessage {
+            text-align: center;
+            font-size: 1.4rem;
+            font-weight: 500;
+            margin-bottom: 14px;
+            line-height: 1.6;
+            opacity: 1;
+            transition: opacity 0.6s ease-in-out, background-color 0.8s ease, color 0.8s ease;
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: inline-block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        #nextMessage.fade-out {
+            opacity: 0;
+        }
+
+        /* Phase background styles */
+        .phase-before {
+            background-color: rgba(255, 215, 0, 0.15);
+            /* gold/amber */
+        }
+
+        .phase-iqama {
+            background-color: rgba(0, 200, 83, 0.15);
+            /* soft green */
+        }
+
+        .phase-next {
+            background-color: rgba(33, 150, 243, 0.15);
+            /* soft blue */
+        }
+
+        .phase-shuruq {
+            background-color: rgba(255, 160, 0, 0.15);
+            /* warm orange */
+        }
+
+        .phase-jumuah {
+            background-color: rgba(0, 150, 136, 0.15);
+            /* teal */
+        }
+
         main {
             flex: 1;
             display: flex;
@@ -192,10 +238,10 @@
                 </div>
             </div>
             <div style="font-size:1.8rem;font-weight:600;" id="liveClock">--:--:--</div>
-            <button id="themeToggle" style="background:none;border:1px solid var(--subtext-color);color:var(--text-color);
+            <!-- <button id="themeToggle" style="background:none;border:1px solid var(--subtext-color);color:var(--text-color);
   padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.9rem;">
                 Toggle Theme
-            </button>
+            </button> -->
         </header>
 
         <main>
@@ -245,7 +291,7 @@
         // Change this to simulate different times.
         // Example: simulate 5:55 AM to test Fajr, or Friday 12:20 PM to test Jumuah.
 
-        let TEST_TIME = null;
+        let TEST_TIME = "2025-10-12T06:03:00";
         // Example format: "2025-10-10T05:55:00"  (set to null for real-time)
 
         function getNow() {
@@ -287,16 +333,38 @@
             return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
         }
 
+        const iqamaChanges = {
+            "2025-10-01": { Fajr: "06:15", Dhuhr: "13:30", Asr: "16:45", Isha: "20:30" },
+            "2025-10-05": { Fajr: "06:30", Dhuhr: "13:30", Asr: "16:45", Isha: "20:15" },
+            "2025-10-12": { Fajr: "06:30", Dhuhr: "13:30", Asr: "16:30", Isha: "20:00" },
+            "2025-10-26": { Fajr: "06:30", Dhuhr: "13:30", Asr: "16:15", Isha: "20:00" },
+        };
+
         // Compute iqama times (static)
         function computeIqamaTimes() {
-            iqamaTimes = {};
-            const fajrIqama = setSpecificTime(6, 30); // 6:30 AM
-            const dhuhrIqama = setSpecificTime(13, 30); // 1:30 PM
-            const asrIqama = setSpecificTime(16, 45); // 4:45 PM
-            const ishaIqama = setSpecificTime(20, 15); // 8:15 PM
+            const now = getNow();
+            const todayKey = now.toISOString().split("T")[0];
 
-            // Maghrib is always 7 minutes after adhan
-            const maghribAdhan = parseTimeToDate(timingsToday['Maghrib']);
+            // Find the most recent date ≤ today in the schedule
+            const applicableDate = Object.keys(iqamaChanges)
+                .filter(d => d <= todayKey)
+                .sort()
+                .pop(); // last (most recent)
+
+            const entry = iqamaChanges[applicableDate];
+            if (!entry) {
+                console.warn("No iqama schedule found for today or earlier!", todayKey);
+                return;
+            }
+
+            // Build the Date objects for today
+            const fajrIqama = parseHMToDate(entry.Fajr);
+            const dhuhrIqama = parseHMToDate(entry.Dhuhr);
+            const asrIqama = parseHMToDate(entry.Asr);
+            const ishaIqama = parseHMToDate(entry.Isha);
+
+            // Maghrib = adhan + 7 minutes
+            const maghribAdhan = parseTimeToDate(timingsToday["Maghrib"]);
             const maghribIqama = new Date(maghribAdhan.getTime() + 7 * 60000);
 
             iqamaTimes = {
@@ -306,6 +374,14 @@
                 Maghrib: maghribIqama,
                 Isha: ishaIqama
             };
+        }
+
+        // helper
+        function parseHMToDate(hm) {
+            const [h, m] = hm.split(":").map(Number);
+            const d = getNow();
+            d.setHours(h, m, 0, 0);
+            return d;
         }
 
         function setSpecificTime(hours24, minutes) {
@@ -403,38 +479,92 @@
                 grid.appendChild(div);
             }
 
-            updateCountdown(upcoming);
+            updateCountdown(upcoming, events);
         }
 
-        function updateCountdown(upcoming) {
+        function updateCountdown(upcoming, events) {
             const nextMsg = document.getElementById("nextMessage");
             const now = getNow();
 
             if (!upcoming || (!upcoming.iqama && !upcoming.adhan)) {
-                nextMsg.textContent = "No more prayers today.";
+                nextMsg.innerHTML = "";
                 document.getElementById("countdown").textContent = "--:--:--";
                 return;
             }
 
-            // Countdown
-            const diffMs = (upcoming.iqama || upcoming.adhan) - now;
-            const h = Math.floor(diffMs / 3600000);
-            const m = Math.floor((diffMs % 3600000) / 60000);
-            const s = Math.floor((diffMs % 60000) / 1000);
-            const countdown = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+            const countdownString = (target) => {
+                if (!target) return "--:--:--";
+                let t = target;
+                if (t < now) t = new Date(t.getTime() + 24 * 3600 * 1000);
+                const diff = t - now;
+                const h = Math.floor(diff / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+            };
 
-            // Update top message
+            let message = "";
+            let countdownTarget = null;
+            let phaseClass = "phase-next"; // default
+
             if (upcoming.name === "Sunrise") {
-                nextMsg.textContent = `🌅 Sunrise is at ${formatTime12(upcoming.adhan)} — in ${countdown}`;
+                message = `🌅 Sunrise is at ${formatTime12(upcoming.adhan)} — in ${countdownString(upcoming.adhan)}`;
+                countdownTarget = upcoming.adhan;
+                phaseClass = "phase-shuruq";
             } else if (upcoming.name.startsWith("Jumuah")) {
-                nextMsg.textContent = `🕌 The next Jumuah (${upcoming.name}) is in ${countdown}`;
+                message = `🕌 The next Jumuah (${upcoming.name}) is in ${countdownString(upcoming.adhan)}`;
+                countdownTarget = upcoming.adhan;
+                phaseClass = "phase-jumuah";
             } else {
-                nextMsg.textContent = `🕒 The next prayer of ${upcoming.name} (Iqama) is in ${countdown}`;
+                const adhan = upcoming.adhan;
+                const iqama = upcoming.iqama;
+
+                if (now < adhan) {
+                    message = `🕰️ ${upcoming.name} time begins in ${countdownString(adhan)}`;
+                    countdownTarget = adhan;
+                    phaseClass = "phase-before";
+                } else if (now >= adhan && now < iqama) {
+                    message = `🙏 The Iqama for ${upcoming.name} will be in ${countdownString(iqama)}`;
+                    countdownTarget = iqama;
+                    phaseClass = "phase-iqama";
+                } else {
+                    const currentIdx = events.findIndex(e => e.name === upcoming.name);
+                    let nextEvent = events[currentIdx + 1];
+                    if (!nextEvent) {
+                        nextEvent = events.find(e => e.name === "Fajr");
+                        if (nextEvent) {
+                            const nextFajrAdhan = new Date(nextEvent.adhan.getTime() + 24 * 3600 * 1000);
+                            message = `🕰️ Next prayer (Fajr) time begins in ${countdownString(nextFajrAdhan)}`;
+                            countdownTarget = nextFajrAdhan;
+                            phaseClass = "phase-next";
+                        }
+                    } else {
+                        message = `🕰️ Next prayer (${nextEvent.name}) time begins in ${countdownString(nextEvent.adhan)}`;
+                        countdownTarget = nextEvent.adhan;
+                        phaseClass = "phase-next";
+                    }
+                }
             }
 
-            // Also update bottom countdown bar
-            document.getElementById("nextLabel").textContent = `Next: ${upcoming.name} (${formatTime12(upcoming.iqama || upcoming.adhan)})`;
-            document.getElementById("countdown").textContent = countdown;
+            // === Smooth fade transition ===
+            if (nextMsg.innerHTML !== message) {
+                nextMsg.classList.add("fade-out");
+                setTimeout(() => {
+                    nextMsg.innerHTML = message;
+                    nextMsg.className = ""; // remove old phases & fade
+                    nextMsg.classList.add(phaseClass);
+                }, 300);
+                setTimeout(() => nextMsg.classList.remove("fade-out"), 400);
+            }
+
+            // === Bottom countdown bar ===
+            if (countdownTarget) {
+                document.getElementById("nextLabel").textContent = `Next: ${formatTime12(countdownTarget)}`;
+                document.getElementById("countdown").textContent = countdownString(countdownTarget);
+            } else {
+                document.getElementById("nextLabel").textContent = "Next: ---";
+                document.getElementById("countdown").textContent = "--:--:--";
+            }
         }
 
         fetchTimings();
