@@ -624,18 +624,26 @@
 
         // Automatic mode based on prayer times
         function autoThemeBasedOnSun() {
-            if (!timingsToday["Fajr"] || !timingsToday["Maghrib"]) return;
-            const now = getNow();
-            const fajr = parseTimeToDate(timingsToday["Fajr"]);
-            const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
+    if (!timingsToday["Fajr"] || !timingsToday["Maghrib"]) return;
 
-            // Daytime = between Fajr and Maghrib
-            if (now >= fajr && now < maghrib) {
-                applyTheme("light");
-            } else {
-                applyTheme("dark");
-            }
-        }
+    // Always evaluate everything in the same timezone (Eastern)
+    const TIMEZONE = "America/New_York";
+
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
+    const fajr = parseTimeToDate(timingsToday["Fajr"]);
+    const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
+
+    // For debugging
+    // console.log("Now", now, "Fajr", fajr, "Maghrib", maghrib);
+
+    // If current time is after Maghrib or before Fajr → dark mode
+    if (now < fajr || now >= maghrib) {
+        applyTheme("dark");
+    } else {
+        applyTheme("light");
+    }
+}
+
 
         // Re-check automatically every minute
         setInterval(autoThemeBasedOnSun, 60000);
