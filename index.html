@@ -637,9 +637,6 @@
             }
         }
 
-        // Restore last saved theme initially (fallback)
-        applyTheme(localStorage.getItem("theme") || "light");
-
         // Re-check automatically every minute
         setInterval(autoThemeBasedOnSun, 60000);
     </script>
