@@ -187,25 +187,6 @@
             font-size: 0.95rem;
         }
 
-        .countdown {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid var(--border-color);
-            color: var(--text-color);
-        }
-
-        .cd-left {
-            font-size: 1.1rem;
-        }
-
-        .cd-time {
-            font-size: 1.6rem;
-            font-weight: 700;
-        }
-
         footer {
             text-align: center;
             padding: 10px;
@@ -321,11 +302,16 @@
         }
 
         function parseTimeToDate(timeStr) {
+            if (!timeStr) return null;
             const t = timeStr.split(' ')[0];
             const [hh, mm] = t.split(':').map(Number);
-            const d = getNow();
-            d.setHours(hh, mm, 0, 0);
-            return d;
+
+            // Force same timezone as main logic
+            const TIMEZONE = "America/New_York";
+
+            const dateInTZ = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
+            dateInTZ.setHours(hh, mm, 0, 0);
+            return dateInTZ;
         }
 
         // Convert date object to 12-hour format (e.g. 6:30 AM)
@@ -574,15 +560,6 @@
                 // Same phase — just update countdown text without fading
                 nextMsg.innerHTML = message;
             }
-
-            // === Bottom countdown bar ===
-            if (countdownTarget) {
-                document.getElementById("nextLabel").textContent = `Next: ${formatTime12(countdownTarget)}`;
-                document.getElementById("countdown").textContent = countdownString(countdownTarget);
-            } else {
-                document.getElementById("nextLabel").textContent = "Next: ---";
-                document.getElementById("countdown").textContent = "--:--:--";
-            }
         }
 
         fetchTimings();
@@ -616,33 +593,30 @@
         }
 
         // Manual toggle handler
-        document.getElementById("themeToggle").addEventListener("click", () => {
-            const current = document.body.classList.contains("dark") ? "dark" : "light";
-            const newMode = current === "dark" ? "light" : "dark";
-            applyTheme(newMode);
-        });
+        // document.getElementById("themeToggle").addEventListener("click", () => {
+        //     const current = document.body.classList.contains("dark") ? "dark" : "light";
+        //     const newMode = current === "dark" ? "light" : "dark";
+        //     applyTheme(newMode);
+        // });
 
         // Automatic mode based on prayer times
         function autoThemeBasedOnSun() {
-    if (!timingsToday["Fajr"] || !timingsToday["Maghrib"]) return;
+            if (!timingsToday["Fajr"] || !timingsToday["Maghrib"]) return;
 
-    // Always evaluate everything in the same timezone (Eastern)
-    const TIMEZONE = "America/New_York";
+            // Always evaluate everything in the same timezone (Eastern)
+            const TIMEZONE = "America/New_York";
 
-    const now = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-    const fajr = parseTimeToDate(timingsToday["Fajr"]);
-    const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
+            const now = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
+            const fajr = parseTimeToDate(timingsToday["Fajr"]);
+            const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
 
-    // For debugging
-    // console.log("Now", now, "Fajr", fajr, "Maghrib", maghrib);
-
-    // If current time is after Maghrib or before Fajr → dark mode
-    if (now < fajr || now >= maghrib) {
-        applyTheme("dark");
-    } else {
-        applyTheme("light");
-    }
-}
+            // If current time is after Maghrib or before Fajr → dark mode
+            if (now < fajr || now >= maghrib) {
+                applyTheme("dark");
+            } else {
+                applyTheme("light");
+            }
+        }
 
 
         // Re-check automatically every minute
