@@ -22,6 +22,9 @@
             --shuruq-bg: linear-gradient(180deg, #fff4d2, #ffe5a0);
             --shuruq-border: #f2b600;
             --shuruq-text: #5a4200;
+            --hijri-color: #005b96;
+            /* deep blue, readable on light background */
+
         }
 
         body.dark {
@@ -37,6 +40,9 @@
             --shuruq-bg: linear-gradient(180deg, #5c4200, #a27c00);
             --shuruq-border: #ffd257;
             --shuruq-text: #fff2c2;
+            --hijri-color: #b0d8ff;
+            /* soft blue, readable on dark background */
+
         }
 
         html,
@@ -182,6 +188,17 @@
             letter-spacing: 0.6px;
         }
 
+        #dateLine {
+            color: var(--subtext-color);
+            font-size: 1rem;
+        }
+
+        #hijriDate {
+            color: var(--hijri-color);
+            font-weight: 500;
+            letter-spacing: 0.3px;
+        }
+
         .iqama {
             margin-top: 6px;
             opacity: 0.9;
@@ -217,6 +234,9 @@
                 <div>
                     <h1 id="mosqueName" style="margin:0;">Your Mosque Name</h1>
                     <div class="sub" style="margin-top:4px;font-size:0.95rem;opacity:0.8;" id="dateLine">Loading…</div>
+                    <div id="hijriDate"
+                        style="font-size:0.9rem;margin-top:2px;color:var(--hijri-color);font-weight:500;">
+                    </div>
                 </div>
             </div>
             <div style="font-size:1.8rem;font-weight:600;" id="liveClock">--:--:--</div>
@@ -266,6 +286,7 @@
 
         const calcMethod = 2;
         let timingsToday = {};
+        let hijriToday = {};
         let iqamaTimes = {};
         let prayerOrder = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
@@ -273,7 +294,7 @@
         // Change this to simulate different times.
         // Example: simulate 5:55 AM to test Fajr, or Friday 12:20 PM to test Jumuah.
 
-        let TEST_TIME = "2025-10-17T05:55:00";
+        let TEST_TIME = null;
         // Example format: "2025-10-10T05:55:00"  (set to null for real-time)
 
         function getNow() {
@@ -289,7 +310,8 @@
                 const json = await res.json();
                 if (json && json.data && json.data.timings) {
                     timingsToday = json.data.timings;
-                    document.getElementById('dateLine').textContent = getNow().toLocaleString();
+                    hijriToday = json.data.date.hijri;
+                    updateDateLine();
                     computeIqamaTimes();
                     renderGrid();
                     autoThemeBasedOnSun();
@@ -303,16 +325,12 @@
         }
 
         function parseTimeToDate(timeStr) {
-            if (!timeStr) return null;
             const t = timeStr.split(' ')[0];
             const [hh, mm] = t.split(':').map(Number);
-
-            // Force same timezone as main logic
-            const TIMEZONE = "America/New_York";
-
-            const dateInTZ = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-            dateInTZ.setHours(hh, mm, 0, 0);
-            return dateInTZ;
+            const base = getNow();
+            const d = new Date(base.getTime()); // make a separate copy
+            d.setHours(hh, mm, 0, 0);
+            return d;
         }
 
         // Convert date object to 12-hour format (e.g. 6:30 AM)
@@ -387,10 +405,27 @@
             // Build the prayer list including Shuruq
             let prayers = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
-            // On Fridays, inject Jumuah slots instead of Dhuhr
+            // 🕌 Show Jumuah cards from Maghrib (Thursday) → until Maghrib (Friday)
+            const maghribToday = parseTimeToDate(timingsToday["Maghrib"]);
+            let showJumuah = false;
+
+            // If it's Friday (day 5)
             if (day === 5) {
+                const now = getNow();
+                // If it's still before Maghrib, show Jumuah
+                if (now < maghribToday) showJumuah = true;
+            }
+            // If it's Thursday (day 4)
+            else if (day === 4) {
+                const now = getNow();
+                // If it's after Maghrib, show Jumuah (prepare board for next day)
+                if (now >= maghribToday) showJumuah = true;
+            }
+
+            if (showJumuah) {
                 prayers = ['Fajr', 'Sunrise', 'Jumuah 1', 'Jumuah 2', 'Jumuah 3', 'Asr', 'Maghrib', 'Isha'];
             }
+
 
             const nowMs = now.getTime();
             const events = [];
@@ -478,6 +513,87 @@
             }
 
             updateCountdown(upcoming, events);
+        }
+
+        function updateDateLine() {
+            const now = getNow();
+
+            // 🗓️ Gregorian date
+            const gregorian = now.toLocaleDateString(undefined, {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            // 🕋 Get Hijri date (prefer API, fallback to Intl)
+            let hijriDay, hijriMonth, hijriYear;
+            if (hijriToday && hijriToday.day && hijriToday.month && hijriToday.year) {
+                hijriDay = parseInt(hijriToday.day);
+                hijriMonth = hijriToday.month.en;
+                hijriYear = hijriToday.year;
+            } else {
+                const hijriFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                });
+                const parts = hijriFormatter.formatToParts(now);
+                hijriDay = parts.find(p => p.type === "day").value;
+                hijriMonth = parts.find(p => p.type === "month").value;
+                hijriYear = parts.find(p => p.type === "year").value;
+            }
+
+            // 🌇 Adjust Hijri rollover after Maghrib
+            // 🌇 Adjust Hijri rollover after Maghrib (using API-based Hijri date only)
+            if (timingsToday["Maghrib"]) {
+                const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
+                if (now >= maghrib && hijriToday && hijriToday.day) {
+                    let nextDay = parseInt(hijriToday.day) + 1;
+                    let nextMonth = hijriToday.month.en;
+                    let nextYear = parseInt(hijriToday.year);
+
+                    // Handle month rollover (29–30 days)
+                    if (nextDay > 30) {
+                        nextDay = 1;
+                        // We could optionally handle month rollover properly via a month list
+                        // but AlAdhan will refresh at midnight anyway with correct next Hijri date.
+                    }
+
+                    hijriDay = nextDay;
+                    hijriMonth = nextMonth;
+                    hijriYear = nextYear;
+                }
+            }
+
+            // 📜 Normalize month names for nicer display
+            const monthMap = {
+                "Muharram": "Muḥarram",
+                "Safar": "Ṣafar",
+                "Rabiʻ I": "Rabīʿ al-Awwal",
+                "Rabiʻ II": "Rabīʿ al-Thānī",
+                "Jumada I": "Jumādā al-Ūlā",
+                "Jumada II": "Jumādā al-Ākhirah",
+                "Rajab": "Rajab",
+                "Shaʻban": "Shaʿbān",
+                "Ramadan": "Ramaḍān",
+                "Shawwal": "Shawwāl",
+                "Dhuʻl-Qaʻdah": "Dhū al-Qaʿdah",
+                "Dhuʻl-Hijjah": "Dhū al-Ḥijjah"
+            };
+
+            if (monthMap[hijriMonth]) hijriMonth = monthMap[hijriMonth];
+
+            // 🧾 Combine nicely
+            const hijriText = `${hijriDay} ${hijriMonth} ${hijriYear} AH`;
+
+            document.getElementById('dateLine').innerHTML = `
+    <span>${gregorian}</span>
+    <span style="opacity:0.5;margin:0 8px;">|</span>
+    <span id="hijriDate" style="color:var(--hijri-color);font-weight:500;">
+      ${hijriText}
+    </span>
+  `;
         }
 
         function updateCountdown(upcoming, events) {
@@ -571,12 +687,10 @@
             const now = getNow();
             const timeString = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
             document.getElementById('liveClock').textContent = timeString;
-            document.getElementById('dateLine').textContent = now.toLocaleDateString(undefined, {
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-            });
         }
         updateLiveClock();
         setInterval(updateLiveClock, 1000);
+        setInterval(updateDateLine, 60000); // update every minute
         const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
         setTimeout(() => {
             console.log("Weekly auto-refresh triggered");
@@ -607,7 +721,8 @@
             // Always evaluate everything in the same timezone (Eastern)
             const TIMEZONE = "America/New_York";
 
-            const now = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
+            const now = getNow();
+            console.log("what is now!??", now)
             const fajr = parseTimeToDate(timingsToday["Fajr"]);
             const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
 
