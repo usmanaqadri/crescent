@@ -202,7 +202,7 @@
         .iqama {
             margin-top: 6px;
             opacity: 0.9;
-            font-size: 0.95rem;
+            font-size: 1.25rem;
         }
 
         footer {
@@ -376,7 +376,7 @@
             const maghribIqama = new Date(maghribAdhan.getTime() + 7 * 60000);
 
             iqamaTimes = {
-                Fajr: fajrIqama,
+                // Fajr: fajrIqama,
                 Dhuhr: dhuhrIqama,
                 Asr: asrIqama,
                 Maghrib: maghribIqama,
@@ -427,6 +427,13 @@
 
             if (showJumuah) {
                 prayers = ['Fajr', 'Sunrise', 'Jumuah 1', 'Jumuah 2', 'Jumuah 3', 'Asr', 'Maghrib', 'Isha'];
+            }
+
+            const ann = document.getElementById("announcements");
+            if (showJumuah) {
+                if (ann) ann.style.display = "none";
+            } else {
+                if (ann) ann.style.display = "block";
             }
 
 
@@ -504,12 +511,12 @@
         <div class="time">${adhanStr}</div>
       `;
                 } else {
-                    const iqStr = e.iqama ? formatTime12(e.iqama) : "--:--";
+                    const iqStr = e.iqama ? formatTime12(e.iqama) : null;
                     div.innerHTML = `
-        <div class="name">${e.name}</div>
-        <div class="time">${adhanStr}</div>
-        <div class="iqama">Iqama: ${iqStr}</div>
-      `;
+    <div class="name">${e.name}</div>
+    <div class="time">${adhanStr}</div>
+    ${iqStr ? `<div class="iqama">Iqama: ${iqStr}</div>` : ""}
+  `;
                 }
 
                 grid.appendChild(div);
@@ -725,7 +732,6 @@
             const TIMEZONE = "America/New_York";
 
             const now = getNow();
-            console.log("what is now!??", now)
             const fajr = parseTimeToDate(timingsToday["Fajr"]);
             const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
 
