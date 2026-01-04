@@ -205,6 +205,34 @@
             font-size: 1rem;
         }
 
+        #flyerOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 999999;
+
+            display: flex;
+            /* keep it mounted */
+            align-items: center;
+            justify-content: center;
+
+            background: black;
+            opacity: 0;
+            pointer-events: none;
+            /* so clicks go to the board when hidden */
+            transition: opacity 600ms ease;
+        }
+
+        #flyerOverlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #flyerOverlay img {
+            max-width: 100vw;
+            max-height: 100vh;
+            object-fit: contain;
+        }
+
         footer {
             text-align: center;
             padding: 10px;
@@ -272,6 +300,9 @@
             </div>
         </main>
 
+        <div id="flyerOverlay" aria-hidden="true">
+            <img id="flyerImg" src="/assets/flyer.jpeg" alt="Event flyer" />
+        </div>
 
         <footer>
             Auto-updating prayer board — configured for this masjid.
@@ -279,6 +310,76 @@
     </div>
 
     <script>
+        // ===== CONFIG =====
+        const SECRET_CODE = "flyer123";      // <-- change this
+        const SHOW_EVERY_MS = 30_000;        // 30s (use 60_000 for 1 minute)
+        const SHOW_FOR_MS = 10_000;         // visible duration
+        const FLYER_URL = "/assets/flyer.jpeg";
+
+        // ===== STATE =====
+        const STORAGE_KEY = "flyerEnabled";
+        let flyerEnabled = localStorage.getItem(STORAGE_KEY) === "true";
+
+        const overlay = document.getElementById("flyerOverlay");
+        const img = document.getElementById("flyerImg");
+        img.src = FLYER_URL;
+
+        // preload (prevents first-time flicker)
+        const preload = new Image();
+        preload.src = FLYER_URL;
+
+        function showFlyer() {
+            if (!flyerEnabled) return;
+
+            overlay.classList.add("show");
+
+            setTimeout(() => {
+                overlay.classList.remove("show");
+            }, SHOW_FOR_MS);
+        }
+
+        // run on a loop
+        setInterval(showFlyer, SHOW_EVERY_MS);
+
+        // ===== SECRET CODE LISTENER =====
+        let buffer = "";
+        let bufferTimer = null;
+
+        function resetBufferSoon() {
+            clearTimeout(bufferTimer);
+            bufferTimer = setTimeout(() => (buffer = ""), 2000); // clear if user pauses typing
+        }
+
+        window.addEventListener("keydown", (e) => {
+            // ignore modifier keys
+            if (e.key.length !== 1) return;
+
+            buffer += e.key.toLowerCase();
+            resetBufferSoon();
+
+            // keep buffer from growing forever
+            if (buffer.length > SECRET_CODE.length) {
+                buffer = buffer.slice(-SECRET_CODE.length);
+            }
+
+            if (buffer === SECRET_CODE.toLowerCase()) {
+                flyerEnabled = !flyerEnabled;
+                localStorage.setItem(STORAGE_KEY, String(flyerEnabled));
+                buffer = "";
+
+                // optional: quick visual confirmation without showing UI chrome
+                console.log(`Flyer rotator: ${flyerEnabled ? "ENABLED" : "DISABLED"}`);
+
+                // if disabling while flyer is showing, hide it immediately
+                if (!flyerEnabled) {
+                    overlay.classList.remove("show");
+                    overlay.setAttribute("aria-hidden", "true");
+                } else {
+                    // optionally show it once immediately when enabled
+                    showFlyer();
+                }
+            }
+        });
         const LAT = 38.912681; // Sterling, VA latitude
         const LON = -77.464279; // Sterling, VA longitude
         const MOSQUE_NAME = "Crescent Islamic Center";
