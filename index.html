@@ -1,854 +1,980 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
-<head>
+  <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
+    <meta
+      http-equiv="Cache-Control"
+      content="no-cache, no-store, must-revalidate"
+    />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Mosque Prayer Board</title>
     <style>
-        :root {
-            /* Light mode colors */
-            --bg-color: #f5f5f5;
-            --card-bg: #ffffff;
-            --text-color: #111;
-            --subtext-color: #333;
-            --accent-bg: rgba(0, 0, 0, 0.05);
-            --highlight-outline: rgba(0, 0, 0, 0.08);
-            --border-color: rgba(0, 0, 0, 0.1);
-            --shadow-color: rgba(0, 0, 0, 0.1);
-            --shuruq-bg: linear-gradient(180deg, #fff4d2, #ffe5a0);
-            --shuruq-border: #f2b600;
-            --shuruq-text: #5a4200;
-            --hijri-color: #005b96;
-            /* deep blue, readable on light background */
+      :root {
+        /* Light mode colors */
+        --bg-color: #f5f5f5;
+        --card-bg: #ffffff;
+        --text-color: #111;
+        --subtext-color: #333;
+        --accent-bg: rgba(0, 0, 0, 0.05);
+        --highlight-outline: rgba(0, 0, 0, 0.08);
+        --border-color: rgba(0, 0, 0, 0.1);
+        --shadow-color: rgba(0, 0, 0, 0.1);
+        --shuruq-bg: linear-gradient(180deg, #fff4d2, #ffe5a0);
+        --shuruq-border: #f2b600;
+        --shuruq-text: #5a4200;
+        --hijri-color: #005b96;
+        /* deep blue, readable on light background */
+      }
 
-        }
+      body.dark {
+        /* Dark mode overrides */
+        --bg-color: #0b1220;
+        --card-bg: linear-gradient(180deg, #07101a, #0e1b2a);
+        --text-color: #fff;
+        --subtext-color: #bbb;
+        --accent-bg: rgba(255, 255, 255, 0.04);
+        --highlight-outline: rgba(255, 255, 255, 0.06);
+        --border-color: rgba(255, 255, 255, 0.08);
+        --shadow-color: rgba(0, 0, 0, 0.6);
+        --shuruq-bg: linear-gradient(180deg, #5c4200, #a27c00);
+        --shuruq-border: #ffd257;
+        --shuruq-text: #fff2c2;
+        --hijri-color: #b0d8ff;
+        /* soft blue, readable on dark background */
+      }
 
-        body.dark {
-            /* Dark mode overrides */
-            --bg-color: #0b1220;
-            --card-bg: linear-gradient(180deg, #07101a, #0e1b2a);
-            --text-color: #fff;
-            --subtext-color: #bbb;
-            --accent-bg: rgba(255, 255, 255, 0.04);
-            --highlight-outline: rgba(255, 255, 255, 0.06);
-            --border-color: rgba(255, 255, 255, 0.08);
-            --shadow-color: rgba(0, 0, 0, 0.6);
-            --shuruq-bg: linear-gradient(180deg, #5c4200, #a27c00);
-            --shuruq-border: #ffd257;
-            --shuruq-text: #fff2c2;
-            --hijri-color: #b0d8ff;
-            /* soft blue, readable on dark background */
+      html,
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+        background: var(--bg-color);
+        color: var(--text-color);
+        transition: background-color 0.8s ease, color 0.8s ease;
+        overflow-y: hidden;
+      }
 
-        }
+      .wrap {
+        display: flex;
+        flex-direction: column;
+      }
 
-        html,
-        body {
-            margin: 0;
-            font-family: Inter, system-ui, sans-serif;
-            background: var(--bg-color);
-            color: var(--text-color);
-            transition: background-color 0.8s ease, color 0.8s ease;
-            overflow-y: hidden;
-        }
+      html,
+      body,
+      .wrap {
+        min-height: 100vh;
+        /* Fill at least the full screen */
+        height: auto;
+        /* But expand beyond if needed */
+        background: var(--bg-color);
+      }
 
-        .wrap {
-            display: flex;
-            flex-direction: column;
-        }
+      header {
+        padding: 16px;
+        text-align: center;
+      }
 
-        html,
-        body,
-        .wrap {
-            min-height: 100vh;
-            /* Fill at least the full screen */
-            height: auto;
-            /* But expand beyond if needed */
-            background: var(--bg-color);
-        }
+      h1 {
+        margin: 0;
+        font-size: 2.2rem;
+        letter-spacing: 0.6px;
+      }
 
+      .sub {
+        color: var(--subtext-color);
+        margin-top: 6px;
+        font-size: 0.95rem;
+      }
 
-        header {
-            padding: 16px;
-            text-align: center;
-        }
+      /* --- Fade & Background Phases --- */
+      #nextMessage {
+        text-align: center;
+        font-size: 1.4rem;
+        font-weight: 500;
+        margin-bottom: 14px;
+        line-height: 1.6;
+        opacity: 1;
+        transition: opacity 0.6s ease-in-out, background-color 0.8s ease,
+          color 0.8s ease;
+        border-radius: 10px;
+        padding: 10px 14px;
+        display: inline-block;
+        margin-left: auto;
+        margin-right: auto;
+      }
 
-        h1 {
-            margin: 0;
-            font-size: 2.2rem;
-            letter-spacing: 0.6px;
-        }
+      #nextMessage.fade-out {
+        opacity: 0;
+      }
 
-        .sub {
-            color: var(--subtext-color);
-            margin-top: 6px;
-            font-size: 0.95rem;
-        }
+      /* Phase background styles */
+      .phase-before {
+        background-color: rgba(255, 215, 0, 0.15);
+        /* gold/amber */
+      }
 
-        /* --- Fade & Background Phases --- */
-        #nextMessage {
-            text-align: center;
-            font-size: 1.4rem;
-            font-weight: 500;
-            margin-bottom: 14px;
-            line-height: 1.6;
-            opacity: 1;
-            transition: opacity 0.6s ease-in-out, background-color 0.8s ease, color 0.8s ease;
-            border-radius: 10px;
-            padding: 10px 14px;
-            display: inline-block;
-            margin-left: auto;
-            margin-right: auto;
-        }
+      .phase-iqama {
+        background-color: rgba(0, 200, 83, 0.15);
+        /* soft green */
+      }
 
-        #nextMessage.fade-out {
-            opacity: 0;
-        }
+      .phase-next {
+        background-color: rgba(33, 150, 243, 0.15);
+        /* soft blue */
+      }
 
-        /* Phase background styles */
-        .phase-before {
-            background-color: rgba(255, 215, 0, 0.15);
-            /* gold/amber */
-        }
+      .phase-shuruq {
+        background-color: rgba(255, 160, 0, 0.15);
+        /* warm orange */
+      }
 
-        .phase-iqama {
-            background-color: rgba(0, 200, 83, 0.15);
-            /* soft green */
-        }
+      .phase-jumuah {
+        background-color: rgba(0, 150, 136, 0.15);
+        /* teal */
+      }
 
-        .phase-next {
-            background-color: rgba(33, 150, 243, 0.15);
-            /* soft blue */
-        }
+      main {
+        flex: 1;
+        display: flex;
+        gap: 12px;
+        padding: 12px;
+        align-items: center;
+        justify-content: center;
+      }
 
-        .phase-shuruq {
-            background-color: rgba(255, 160, 0, 0.15);
-            /* warm orange */
-        }
+      .card {
+        display: flex;
+        flex-direction: column;
+        width: min(1100px, 98%);
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 18px;
+        box-shadow: 0 8px 30px var(--shadow-color);
+        transition: background 0.8s ease, box-shadow 0.8s ease;
+      }
 
-        .phase-jumuah {
-            background-color: rgba(0, 150, 136, 0.15);
-            /* teal */
-        }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 14px;
+      }
 
-        main {
-            flex: 1;
-            display: flex;
-            gap: 12px;
-            padding: 12px;
-            align-items: center;
-            justify-content: center;
-        }
+      .prayer {
+        padding: 18px;
+        text-align: center;
+        border-radius: 10px;
+        background: var(--accent-bg);
+        transition: background 0.8s ease;
+      }
 
-        .card {
-            display: flex;
-            flex-direction: column;
-            width: min(1100px, 98%);
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 18px;
-            box-shadow: 0 8px 30px var(--shadow-color);
-            transition: background 0.8s ease, box-shadow 0.8s ease;
-        }
+      .prayer.current {
+        outline: 3px solid #f7d65c;
+        box-shadow: 0 0 12px 2px rgba(247, 214, 92, 0.6);
+        background: var(--accent-bg);
+        transition: all 0.5s ease;
+      }
 
+      .name {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+
+      .time {
+        font-size: 1.8rem;
+        font-weight: 700;
+        letter-spacing: 0.6px;
+      }
+
+      #dateLine {
+        color: var(--subtext-color);
+        font-size: 1rem;
+      }
+
+      #hijriDate {
+        color: var(--hijri-color);
+        font-weight: 500;
+        letter-spacing: 0.3px;
+      }
+
+      .iqama {
+        margin-top: 6px;
+        opacity: 0.9;
+        font-size: 1rem;
+      }
+
+      #flyerOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+
+        display: flex;
+        /* keep it mounted */
+        align-items: center;
+        justify-content: center;
+
+        background: black;
+        opacity: 0;
+        pointer-events: none;
+        /* so clicks go to the board when hidden */
+        transition: opacity 600ms ease;
+      }
+
+      #flyerOverlay.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      #flyerOverlay img {
+        max-width: 100vw;
+        max-height: 100vh;
+        object-fit: contain;
+      }
+
+      footer {
+        text-align: center;
+        padding: 10px;
+        opacity: 0.8;
+        font-size: 0.9rem;
+        color: var(--subtext-color);
+      }
+
+      @media (max-width: 900px) {
         .grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-bottom: 14px;
-        }
-
-        .prayer {
-            padding: 18px;
-            text-align: center;
-            border-radius: 10px;
-            background: var(--accent-bg);
-            transition: background 0.8s ease;
-        }
-
-        .prayer.current {
-            outline: 3px solid #f7d65c;
-            box-shadow: 0 0 12px 2px rgba(247, 214, 92, 0.6);
-            background: var(--accent-bg);
-            transition: all 0.5s ease;
-        }
-
-        .name {
-            font-size: 1.05rem;
-            font-weight: 600;
-            margin-bottom: 6px;
+          grid-template-columns: repeat(2, 1fr);
         }
 
         .time {
-            font-size: 1.8rem;
-            font-weight: 700;
-            letter-spacing: 0.6px;
+          font-size: 1.5rem;
         }
-
-        #dateLine {
-            color: var(--subtext-color);
-            font-size: 1rem;
-        }
-
-        #hijriDate {
-            color: var(--hijri-color);
-            font-weight: 500;
-            letter-spacing: 0.3px;
-        }
-
-        .iqama {
-            margin-top: 6px;
-            opacity: 0.9;
-            font-size: 1rem;
-        }
-
-        #flyerOverlay {
-            position: fixed;
-            inset: 0;
-            z-index: 999999;
-
-            display: flex;
-            /* keep it mounted */
-            align-items: center;
-            justify-content: center;
-
-            background: black;
-            opacity: 0;
-            pointer-events: none;
-            /* so clicks go to the board when hidden */
-            transition: opacity 600ms ease;
-        }
-
-        #flyerOverlay.show {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        #flyerOverlay img {
-            max-width: 100vw;
-            max-height: 100vh;
-            object-fit: contain;
-        }
-
-        footer {
-            text-align: center;
-            padding: 10px;
-            opacity: 0.8;
-            font-size: 0.9rem;
-            color: var(--subtext-color);
-        }
-
-        @media (max-width: 900px) {
-            .grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
-            .time {
-                font-size: 1.5rem;
-            }
-        }
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="wrap">
-        <header style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;">
-            <div style="display:flex;align-items:center;gap:12px;">
-                <img src="./logo.png" alt="Mosque Logo" id="mosqueLogo"
-                    style="height:60px;width:auto;border-radius:8px;">
-                <div>
-                    <h1 id="mosqueName" style="margin:0;">Your Mosque Name</h1>
-                    <div class="sub" style="margin-top:4px;font-size:0.95rem;opacity:0.8;" id="dateLine">Loading…</div>
-                    <div id="hijriDate"
-                        style="font-size:0.9rem;margin-top:2px;color:var(--hijri-color);font-weight:500;">
-                    </div>
-                </div>
+      <header
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 24px;
+        "
+      >
+        <div style="display: flex; align-items: center; gap: 12px">
+          <img
+            src="./logo.png"
+            alt="Mosque Logo"
+            id="mosqueLogo"
+            style="height: 60px; width: auto; border-radius: 8px"
+          />
+          <div>
+            <h1 id="mosqueName" style="margin: 0">Your Mosque Name</h1>
+            <div
+              class="sub"
+              style="margin-top: 4px; font-size: 0.95rem; opacity: 0.8"
+              id="dateLine"
+            >
+              Loading…
             </div>
-            <div style="font-size:1.8rem;font-weight:600;" id="liveClock">--:--:--</div>
-            <!-- <button id="themeToggle" style="background:none;border:1px solid var(--subtext-color);color:var(--text-color);
+            <div
+              id="hijriDate"
+              style="
+                font-size: 0.9rem;
+                margin-top: 2px;
+                color: var(--hijri-color);
+                font-weight: 500;
+              "
+            ></div>
+          </div>
+        </div>
+        <div style="font-size: 1.8rem; font-weight: 600" id="liveClock">
+          --:--:--
+        </div>
+        <!-- <button id="themeToggle" style="background:none;border:1px solid var(--subtext-color);color:var(--text-color);
   padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.9rem;">
                 Toggle Theme
             </button> -->
-        </header>
+      </header>
 
-        <main>
-            <div class="card">
-                <div id="nextMessage" style="
-  text-align:center;
-  font-size:1.4rem;
-  font-weight:600;
-  margin-bottom:14px;
-  margin-top:6px;
-"></div>
+      <main>
+        <div class="card">
+          <div
+            id="nextMessage"
+            style="
+              text-align: center;
+              font-size: 1.4rem;
+              font-weight: 600;
+              margin-bottom: 14px;
+              margin-top: 6px;
+            "
+          ></div>
 
-                <div class="grid" id="prayerGrid"></div>
+          <div class="grid" id="prayerGrid"></div>
 
-
-                <!-- 🕌 Announcements Section -->
-                <div id="announcements" style="margin:10px 0; padding:12px; text-align:center; border-radius:8px;
-    background:rgba(255,255,255,0.04); font-size:1.05rem; line-height:1.5;">
-                    <div>📢 Jummah Times:</div>
-                    <div>11:30 AM (Hanafi)</div>
-                    <div>12:30 PM (Hanafi)</div>
-                    <div>1:30 PM (Jaffari)</div>
-                    <br>
-                    <div>📢 Thursday Maghrib prayer will be downstairs in the event hall</div>
-                </div>
+          <!-- 🕌 Announcements Section -->
+          <div
+            id="announcements"
+            style="
+              margin: 10px 0;
+              padding: 12px;
+              text-align: center;
+              border-radius: 8px;
+              background: rgba(255, 255, 255, 0.04);
+              font-size: 1.05rem;
+              line-height: 1.5;
+            "
+          >
+            <div>📢 Jummah Times:</div>
+            <div>11:30 AM (Hanafi)</div>
+            <div>12:30 PM (Hanafi)</div>
+            <div>1:30 PM (Jaffari)</div>
+            <br />
+            <div>
+              📢 Thursday Maghrib prayer will be downstairs in the event hall
             </div>
-        </main>
-
-        <div id="flyerOverlay" aria-hidden="true">
-            <img id="flyerImg" src="/assets/flyer.jpeg" alt="Event flyer" />
+          </div>
         </div>
+      </main>
 
-        <footer>
-            Auto-updating prayer board — configured for this masjid.
-        </footer>
+      <div id="flyerOverlay" aria-hidden="true">
+        <img id="flyerImg" src="/assets/flyer.jpeg" alt="Event flyer" />
+      </div>
+
+      <footer>Auto-updating prayer board — configured for this masjid.</footer>
     </div>
 
     <script>
-        // ===== CONFIG =====
-        const SECRET_CODE = "flyer123";      // <-- change this
-        const SHOW_EVERY_MS = 30_000;        // 30s (use 60_000 for 1 minute)
-        const SHOW_FOR_MS = 10_000;         // visible duration
-        const FLYER_URL = "/assets/flyer.jpeg";
+      // ===== CONFIG =====
+      const SECRET_CODE = "flyer123"; // <-- change this
+      const SHOW_EVERY_MS = 30_000; // 30s (use 60_000 for 1 minute)
+      const SHOW_FOR_MS = 10_000; // visible duration
+      const FLYER_URL = "/assets/flyer.jpeg";
 
-        // ===== STATE =====
-        const STORAGE_KEY = "flyerEnabled";
-        let flyerEnabled = localStorage.getItem(STORAGE_KEY) === "true";
+      // ===== STATE =====
+      const STORAGE_KEY = "flyerEnabled";
+      let flyerEnabled = localStorage.getItem(STORAGE_KEY) === "true";
 
-        const overlay = document.getElementById("flyerOverlay");
-        const img = document.getElementById("flyerImg");
-        img.src = FLYER_URL;
+      const overlay = document.getElementById("flyerOverlay");
+      const img = document.getElementById("flyerImg");
+      img.src = FLYER_URL;
 
-        // preload (prevents first-time flicker)
-        const preload = new Image();
-        preload.src = FLYER_URL;
+      // preload (prevents first-time flicker)
+      const preload = new Image();
+      preload.src = FLYER_URL;
 
-        function showFlyer() {
-            if (!flyerEnabled) return;
+      function showFlyer() {
+        if (!flyerEnabled) return;
 
-            overlay.classList.add("show");
+        overlay.classList.add("show");
 
-            setTimeout(() => {
-                overlay.classList.remove("show");
-            }, SHOW_FOR_MS);
+        setTimeout(() => {
+          overlay.classList.remove("show");
+        }, SHOW_FOR_MS);
+      }
+
+      // run on a loop
+      setInterval(showFlyer, SHOW_EVERY_MS);
+
+      // ===== SECRET CODE LISTENER =====
+      let buffer = "";
+      let bufferTimer = null;
+
+      function resetBufferSoon() {
+        clearTimeout(bufferTimer);
+        bufferTimer = setTimeout(() => (buffer = ""), 2000); // clear if user pauses typing
+      }
+
+      function toggleFlyer() {
+        flyerEnabled = !flyerEnabled;
+        localStorage.setItem(STORAGE_KEY, String(flyerEnabled));
+        buffer = "";
+
+        // optional: quick visual confirmation without showing UI chrome
+        console.log(`Flyer rotator: ${flyerEnabled ? "ENABLED" : "DISABLED"}`);
+
+        // if disabling while flyer is showing, hide it immediately
+        if (!flyerEnabled) {
+          overlay.classList.remove("show");
+          overlay.setAttribute("aria-hidden", "true");
+        } else {
+          // optionally show it once immediately when enabled
+          showFlyer();
+        }
+      }
+
+      window.addEventListener("keydown", (e) => {
+        // ignore modifier keys
+        if (e.key.length !== 1) return;
+
+        buffer += e.key.toLowerCase();
+        resetBufferSoon();
+
+        // keep buffer from growing forever
+        if (buffer.length > SECRET_CODE.length) {
+          buffer = buffer.slice(-SECRET_CODE.length);
         }
 
-        // run on a loop
-        setInterval(showFlyer, SHOW_EVERY_MS);
+        if (buffer === SECRET_CODE.toLowerCase()) {
+          toggleFlyer();
+        }
+      });
+      const LAT = 38.912681; // Sterling, VA latitude
+      const LON = -77.464279; // Sterling, VA longitude
+      const MOSQUE_NAME = "Crescent Islamic Center";
+      document.getElementById("mosqueName").textContent = MOSQUE_NAME;
 
-        // ===== SECRET CODE LISTENER =====
-        let buffer = "";
-        let bufferTimer = null;
+      const calcMethod = 2;
+      let timingsToday = {};
+      let hijriToday = {};
+      let iqamaTimes = {};
+      let prayerOrder = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
 
-        function resetBufferSoon() {
-            clearTimeout(bufferTimer);
-            bufferTimer = setTimeout(() => (buffer = ""), 2000); // clear if user pauses typing
+      // === Time Override for Testing ===
+      // Change this to simulate different times.
+      // Example: simulate 5:55 AM to test Fajr, or Friday 12:20 PM to test Jumuah.
+
+      let TEST_TIME = null;
+      // Example format: "2025-10-10T05:55:00"  (set to null for real-time)
+
+      function getNow() {
+        return TEST_TIME ? new Date(TEST_TIME) : new Date();
+      }
+
+      async function fetchTimings() {
+        try {
+          const today = getNow();
+          const timestamp = Math.floor(today.getTime() / 1000);
+          const url = `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${LAT}&longitude=${LON}&method=${calcMethod}`;
+          const res = await fetch(url);
+          const json = await res.json();
+          if (json && json.data && json.data.timings) {
+            timingsToday = json.data.timings;
+            hijriToday = json.data.date.hijri;
+            updateDateLine();
+            computeIqamaTimes();
+            renderGrid();
+            autoThemeBasedOnSun();
+          } else {
+            console.error("Bad timings response", json);
+          }
+        } catch (err) {
+          console.error("Error fetching timings", err);
+          document.getElementById("dateLine").textContent =
+            "Error fetching timings (offline?)";
+        }
+      }
+
+      function parseTimeToDate(timeStr) {
+        const t = timeStr.split(" ")[0];
+        const [hh, mm] = t.split(":").map(Number);
+        const base = getNow();
+        const d = new Date(base.getTime()); // make a separate copy
+        d.setHours(hh, mm, 0, 0);
+        return d;
+      }
+
+      // Convert date object to 12-hour format (e.g. 6:30 AM)
+      function formatTime12(d) {
+        return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      }
+
+      const iqamaChanges = {
+        "2025-10-01": {
+          Fajr: "06:15",
+          Dhuhr: "13:30",
+          Asr: "16:45",
+          Isha: "20:30",
+        },
+        "2025-10-05": {
+          Fajr: "06:30",
+          Dhuhr: "13:30",
+          Asr: "16:45",
+          Isha: "20:15",
+        },
+        "2025-10-12": {
+          Fajr: "06:30",
+          Dhuhr: "13:30",
+          Asr: "16:30",
+          Isha: "20:00",
+        },
+        "2025-10-26": {
+          Fajr: "06:30",
+          Dhuhr: "13:30",
+          Asr: "16:15",
+          Isha: "20:00",
+        },
+        "2025-11-02": {
+          Fajr: "05:45",
+          Dhuhr: "13:30",
+          Asr: "15:00",
+          Isha: "18:45",
+        },
+        "2025-11-09": {
+          Fajr: "06:00",
+          Dhuhr: "13:30",
+          Asr: "15:00",
+          Isha: "18:45",
+        },
+        "2025-11-23": {
+          Fajr: "06:15",
+          Dhuhr: "13:30",
+          Asr: "15:00",
+          Isha: "18:45",
+        },
+      };
+
+      // Compute iqama times (static)
+      function computeIqamaTimes() {
+        const now = getNow();
+        const todayKey = now.toISOString().split("T")[0];
+
+        // Find the most recent date ≤ today in the schedule
+        const applicableDate = Object.keys(iqamaChanges)
+          .filter((d) => d <= todayKey)
+          .sort()
+          .pop(); // last (most recent)
+
+        const entry = iqamaChanges[applicableDate];
+        if (!entry) {
+          console.warn(
+            "No iqama schedule found for today or earlier!",
+            todayKey
+          );
+          return;
         }
 
-        window.addEventListener("keydown", (e) => {
-            // ignore modifier keys
-            if (e.key.length !== 1) return;
+        // Build the Date objects for today
+        const fajrIqama = parseHMToDate(entry.Fajr);
+        const dhuhrIqama = parseHMToDate(entry.Dhuhr);
+        const asrIqama = parseHMToDate(entry.Asr);
+        const ishaIqama = parseHMToDate(entry.Isha);
 
-            buffer += e.key.toLowerCase();
-            resetBufferSoon();
+        // Maghrib = adhan + 7 minutes
+        const maghribAdhan = parseTimeToDate(timingsToday["Maghrib"]);
+        const maghribIqama = new Date(maghribAdhan.getTime() + 7 * 60000);
 
-            // keep buffer from growing forever
-            if (buffer.length > SECRET_CODE.length) {
-                buffer = buffer.slice(-SECRET_CODE.length);
-            }
-
-            if (buffer === SECRET_CODE.toLowerCase()) {
-                flyerEnabled = !flyerEnabled;
-                localStorage.setItem(STORAGE_KEY, String(flyerEnabled));
-                buffer = "";
-
-                // optional: quick visual confirmation without showing UI chrome
-                console.log(`Flyer rotator: ${flyerEnabled ? "ENABLED" : "DISABLED"}`);
-
-                // if disabling while flyer is showing, hide it immediately
-                if (!flyerEnabled) {
-                    overlay.classList.remove("show");
-                    overlay.setAttribute("aria-hidden", "true");
-                } else {
-                    // optionally show it once immediately when enabled
-                    showFlyer();
-                }
-            }
-        });
-        const LAT = 38.912681; // Sterling, VA latitude
-        const LON = -77.464279; // Sterling, VA longitude
-        const MOSQUE_NAME = "Crescent Islamic Center";
-        document.getElementById('mosqueName').textContent = MOSQUE_NAME;
-
-        const calcMethod = 2;
-        let timingsToday = {};
-        let hijriToday = {};
-        let iqamaTimes = {};
-        let prayerOrder = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-
-        // === Time Override for Testing ===
-        // Change this to simulate different times.
-        // Example: simulate 5:55 AM to test Fajr, or Friday 12:20 PM to test Jumuah.
-
-        let TEST_TIME = null;
-        // Example format: "2025-10-10T05:55:00"  (set to null for real-time)
-
-        function getNow() {
-            return TEST_TIME ? new Date(TEST_TIME) : new Date();
-        }
-
-        async function fetchTimings() {
-            try {
-                const today = getNow();
-                const timestamp = Math.floor(today.getTime() / 1000);
-                const url = `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${LAT}&longitude=${LON}&method=${calcMethod}`;
-                const res = await fetch(url);
-                const json = await res.json();
-                if (json && json.data && json.data.timings) {
-                    timingsToday = json.data.timings;
-                    hijriToday = json.data.date.hijri;
-                    updateDateLine();
-                    computeIqamaTimes();
-                    renderGrid();
-                    autoThemeBasedOnSun();
-                } else {
-                    console.error('Bad timings response', json);
-                }
-            } catch (err) {
-                console.error('Error fetching timings', err);
-                document.getElementById('dateLine').textContent = 'Error fetching timings (offline?)';
-            }
-        }
-
-        function parseTimeToDate(timeStr) {
-            const t = timeStr.split(' ')[0];
-            const [hh, mm] = t.split(':').map(Number);
-            const base = getNow();
-            const d = new Date(base.getTime()); // make a separate copy
-            d.setHours(hh, mm, 0, 0);
-            return d;
-        }
-
-        // Convert date object to 12-hour format (e.g. 6:30 AM)
-        function formatTime12(d) {
-            return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        }
-
-        const iqamaChanges = {
-            "2025-10-01": { Fajr: "06:15", Dhuhr: "13:30", Asr: "16:45", Isha: "20:30" },
-            "2025-10-05": { Fajr: "06:30", Dhuhr: "13:30", Asr: "16:45", Isha: "20:15" },
-            "2025-10-12": { Fajr: "06:30", Dhuhr: "13:30", Asr: "16:30", Isha: "20:00" },
-            "2025-10-26": { Fajr: "06:30", Dhuhr: "13:30", Asr: "16:15", Isha: "20:00" },
-            "2025-11-02": { Fajr: "05:45", Dhuhr: "13:30", Asr: "15:00", Isha: "18:45" },
-            "2025-11-09": { Fajr: "06:00", Dhuhr: "13:30", Asr: "15:00", Isha: "18:45" },
-            "2025-11-23": { Fajr: "06:15", Dhuhr: "13:30", Asr: "15:00", Isha: "18:45" },
+        iqamaTimes = {
+          // Fajr: fajrIqama,
+          // Dhuhr: dhuhrIqama,
+          // Asr: asrIqama,
+          Maghrib: maghribIqama,
+          Isha: ishaIqama,
         };
+      }
 
-        // Compute iqama times (static)
-        function computeIqamaTimes() {
-            const now = getNow();
-            const todayKey = now.toISOString().split("T")[0];
+      // helper
+      function parseHMToDate(hm) {
+        const [h, m] = hm.split(":").map(Number);
+        const d = getNow();
+        d.setHours(h, m, 0, 0);
+        return d;
+      }
 
-            // Find the most recent date ≤ today in the schedule
-            const applicableDate = Object.keys(iqamaChanges)
-                .filter(d => d <= todayKey)
-                .sort()
-                .pop(); // last (most recent)
+      function setSpecificTime(hours24, minutes) {
+        const d = getNow();
+        d.setHours(hours24, minutes, 0, 0);
+        return d;
+      }
 
-            const entry = iqamaChanges[applicableDate];
-            if (!entry) {
-                console.warn("No iqama schedule found for today or earlier!", todayKey);
-                return;
-            }
+      function renderGrid() {
+        const grid = document.getElementById("prayerGrid");
+        grid.innerHTML = "";
 
-            // Build the Date objects for today
-            const fajrIqama = parseHMToDate(entry.Fajr);
-            const dhuhrIqama = parseHMToDate(entry.Dhuhr);
-            const asrIqama = parseHMToDate(entry.Asr);
-            const ishaIqama = parseHMToDate(entry.Isha);
+        const now = getNow();
+        const day = now.getDay(); // 0=Sun ... 5=Fri
 
-            // Maghrib = adhan + 7 minutes
-            const maghribAdhan = parseTimeToDate(timingsToday["Maghrib"]);
-            const maghribIqama = new Date(maghribAdhan.getTime() + 7 * 60000);
+        // Build the prayer list including Shuruq
+        let prayers = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
 
-            iqamaTimes = {
-                // Fajr: fajrIqama,
-                Dhuhr: dhuhrIqama,
-                Asr: asrIqama,
-                Maghrib: maghribIqama,
-                Isha: ishaIqama
+        // 🕌 Show Jumuah cards from Maghrib (Thursday) → until Maghrib (Friday)
+        const maghribToday = parseTimeToDate(timingsToday["Maghrib"]);
+        let showJumuah = false;
+
+        // If it's Friday (day 5)
+        if (day === 5) {
+          const now = getNow();
+          // If it's still before Maghrib, show Jumuah
+          if (now < maghribToday) showJumuah = true;
+        }
+        // If it's Thursday (day 4)
+        else if (day === 4) {
+          const now = getNow();
+          // If it's after Maghrib, show Jumuah (prepare board for next day)
+          if (now >= maghribToday) showJumuah = true;
+        }
+
+        if (showJumuah) {
+          prayers = [
+            "Fajr",
+            "Sunrise",
+            "Jumuah 1",
+            "Jumuah 2",
+            "Jumuah 3",
+            "Asr",
+            "Maghrib",
+            "Isha",
+          ];
+        }
+
+        const ann = document.getElementById("announcements");
+        if (showJumuah) {
+          if (ann) ann.style.display = "none";
+        } else {
+          if (ann) ann.style.display = "block";
+        }
+
+        const nowMs = now.getTime();
+        const events = [];
+
+        // Build event list with actual Date objects
+        for (const p of prayers) {
+          if (p.startsWith("Jumuah")) {
+            // Three fixed Friday slots
+            const index = parseInt(p.split(" ")[1]);
+            const times = [
+              { hour: 11, minute: 30, madhhab: "Hanafi" },
+              { hour: 12, minute: 30, madhhab: "Hanafi" },
+              { hour: 13, minute: 30, madhhab: "Jaffari" },
+            ];
+            const info = times[index - 1];
+            const d = getNow();
+            d.setHours(info.hour, info.minute, 0, 0);
+            events.push({ name: p, adhan: d, madhhab: info.madhhab });
+          } else if (p === "Sunrise") {
+            const t = parseTimeToDate(timingsToday["Sunrise"]);
+            events.push({ name: "Sunrise", adhan: t });
+          } else {
+            const adhan = parseTimeToDate(timingsToday[p]);
+            const iq = iqamaTimes[p];
+            events.push({ name: p, adhan, iqama: iq });
+          }
+        }
+
+        // Determine next upcoming event
+        let upcoming = events
+          .filter((e) => {
+            // If it has iqama, use that; otherwise fall back to adhan (e.g. Shuruq, Jumuah)
+            const t = e.iqama || e.adhan;
+            return t && t.getTime() > nowMs;
+          })
+          .sort((a, b) => {
+            const ta = a.iqama ? a.iqama.getTime() : a.adhan.getTime();
+            const tb = b.iqama ? b.iqama.getTime() : b.adhan.getTime();
+            return ta - tb;
+          })[0];
+
+        // If no upcoming events today, use tomorrow's Fajr
+        if (!upcoming) {
+          const fajrEvent = events.find((e) => e.name === "Fajr");
+          if (fajrEvent) {
+            upcoming = {
+              name: "Fajr",
+              adhan: new Date(fajrEvent.adhan.getTime() + 24 * 3600 * 1000),
+              iqama: fajrEvent.iqama
+                ? new Date(fajrEvent.iqama.getTime() + 24 * 3600 * 1000)
+                : null,
             };
+          }
         }
 
-        // helper
-        function parseHMToDate(hm) {
-            const [h, m] = hm.split(":").map(Number);
-            const d = getNow();
-            d.setHours(h, m, 0, 0);
-            return d;
-        }
+        // Create all prayer cards
+        for (const e of events) {
+          const adhanStr = e.adhan ? formatTime12(e.adhan) : "--:--";
+          const div = document.createElement("div");
 
-        function setSpecificTime(hours24, minutes) {
-            const d = getNow();
-            d.setHours(hours24, minutes, 0, 0);
-            return d;
-        }
+          // Base card classes
+          div.className = "prayer";
+          if (upcoming && e.name === upcoming.name)
+            div.classList.add("current");
 
-        function renderGrid() {
-            const grid = document.getElementById("prayerGrid");
-            grid.innerHTML = "";
-
-            const now = getNow();
-            const day = now.getDay(); // 0=Sun ... 5=Fri
-
-            // Build the prayer list including Shuruq
-            let prayers = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-
-            // 🕌 Show Jumuah cards from Maghrib (Thursday) → until Maghrib (Friday)
-            const maghribToday = parseTimeToDate(timingsToday["Maghrib"]);
-            let showJumuah = false;
-
-            // If it's Friday (day 5)
-            if (day === 5) {
-                const now = getNow();
-                // If it's still before Maghrib, show Jumuah
-                if (now < maghribToday) showJumuah = true;
-            }
-            // If it's Thursday (day 4)
-            else if (day === 4) {
-                const now = getNow();
-                // If it's after Maghrib, show Jumuah (prepare board for next day)
-                if (now >= maghribToday) showJumuah = true;
-            }
-
-            if (showJumuah) {
-                prayers = ['Fajr', 'Sunrise', 'Jumuah 1', 'Jumuah 2', 'Jumuah 3', 'Asr', 'Maghrib', 'Isha'];
-            }
-
-            const ann = document.getElementById("announcements");
-            if (showJumuah) {
-                if (ann) ann.style.display = "none";
-            } else {
-                if (ann) ann.style.display = "block";
-            }
-
-
-            const nowMs = now.getTime();
-            const events = [];
-
-            // Build event list with actual Date objects
-            for (const p of prayers) {
-                if (p.startsWith("Jumuah")) {
-                    // Three fixed Friday slots
-                    const index = parseInt(p.split(" ")[1]);
-                    const times = [
-                        { hour: 11, minute: 30, madhhab: "Hanafi" },
-                        { hour: 12, minute: 30, madhhab: "Hanafi" },
-                        { hour: 13, minute: 30, madhhab: "Jaffari" },
-                    ];
-                    const info = times[index - 1];
-                    const d = getNow();
-                    d.setHours(info.hour, info.minute, 0, 0);
-                    events.push({ name: p, adhan: d, madhhab: info.madhhab });
-                } else if (p === "Sunrise") {
-                    const t = parseTimeToDate(timingsToday["Sunrise"]);
-                    events.push({ name: "Sunrise", adhan: t });
-                } else {
-                    const adhan = parseTimeToDate(timingsToday[p]);
-                    const iq = iqamaTimes[p];
-                    events.push({ name: p, adhan, iqama: iq });
-                }
-            }
-
-            // Determine next upcoming event
-            let upcoming = events
-                .filter(e => {
-                    // If it has iqama, use that; otherwise fall back to adhan (e.g. Shuruq, Jumuah)
-                    const t = e.iqama || e.adhan;
-                    return t && t.getTime() > nowMs;
-                })
-                .sort((a, b) => {
-                    const ta = a.iqama ? a.iqama.getTime() : a.adhan.getTime();
-                    const tb = b.iqama ? b.iqama.getTime() : b.adhan.getTime();
-                    return ta - tb;
-                })[0];
-
-            // If no upcoming events today, use tomorrow's Fajr
-            if (!upcoming) {
-                const fajrEvent = events.find(e => e.name === "Fajr");
-                if (fajrEvent) {
-                    upcoming = {
-                        name: "Fajr",
-                        adhan: new Date(fajrEvent.adhan.getTime() + 24 * 3600 * 1000),
-                        iqama: fajrEvent.iqama ? new Date(fajrEvent.iqama.getTime() + 24 * 3600 * 1000) : null
-                    };
-                }
-            }
-
-            // Create all prayer cards
-            for (const e of events) {
-                const adhanStr = e.adhan ? formatTime12(e.adhan) : "--:--";
-                const div = document.createElement("div");
-
-                // Base card classes
-                div.className = "prayer";
-                if (upcoming && e.name === upcoming.name) div.classList.add("current");
-
-                // Build card content
-                if (e.name.startsWith("Jumuah")) {
-                    div.innerHTML = `
+          // Build card content
+          if (e.name.startsWith("Jumuah")) {
+            div.innerHTML = `
         <div class="name">${e.name}</div>
         <div class="time">${adhanStr}</div>
         <div class="iqama">${e.madhhab}</div>
       `;
-                } else if (e.name === "Sunrise") {
-                    div.innerHTML = `
+          } else if (e.name === "Sunrise") {
+            div.innerHTML = `
         <div class="name">Shuruq</div>
         <div class="time">${adhanStr}</div>
       `;
-                } else {
-                    const iqStr = e.iqama ? formatTime12(e.iqama) : null;
-                    div.innerHTML = `
+          } else {
+            const iqStr = e.iqama ? formatTime12(e.iqama) : null;
+            div.innerHTML = `
     <div class="name">${e.name}</div>
     <div class="time">${adhanStr}</div>
     ${iqStr ? `<div class="iqama">Iqama: ${iqStr}</div>` : ""}
   `;
-                }
+          }
 
-                grid.appendChild(div);
-            }
-
-            updateCountdown(upcoming, events);
+          grid.appendChild(div);
         }
 
-        function updateDateLine() {
-            const now = getNow();
+        updateCountdown(upcoming, events);
+      }
 
-            // 🗓️ Gregorian date
-            const gregorian = now.toLocaleDateString(undefined, {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
+      function updateDateLine() {
+        const now = getNow();
 
-            // 🕋 Get Hijri date (prefer API, fallback to Intl)
-            let hijriDay, hijriMonth, hijriYear;
-            if (hijriToday && hijriToday.day && hijriToday.month && hijriToday.year) {
-                hijriDay = parseInt(hijriToday.day);
-                hijriMonth = hijriToday.month.en;
-                hijriYear = hijriToday.year;
-            } else {
-                const hijriFormatter = new Intl.DateTimeFormat('en-u-ca-islamic', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                });
-                const parts = hijriFormatter.formatToParts(now);
-                hijriDay = parts.find(p => p.type === "day").value;
-                hijriMonth = parts.find(p => p.type === "month").value;
-                hijriYear = parts.find(p => p.type === "year").value;
+        // 🗓️ Gregorian date
+        const gregorian = now.toLocaleDateString(undefined, {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+
+        // 🕋 Get Hijri date (prefer API, fallback to Intl)
+        let hijriDay, hijriMonth, hijriYear;
+        if (
+          hijriToday &&
+          hijriToday.day &&
+          hijriToday.month &&
+          hijriToday.year
+        ) {
+          hijriDay = parseInt(hijriToday.day);
+          hijriMonth = hijriToday.month.en;
+          hijriYear = hijriToday.year;
+        } else {
+          const hijriFormatter = new Intl.DateTimeFormat("en-u-ca-islamic", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          });
+          const parts = hijriFormatter.formatToParts(now);
+          hijriDay = parts.find((p) => p.type === "day").value;
+          hijriMonth = parts.find((p) => p.type === "month").value;
+          hijriYear = parts.find((p) => p.type === "year").value;
+        }
+
+        // 🌇 Adjust Hijri rollover after Maghrib
+        // 🌇 Adjust Hijri rollover after Maghrib (using API-based Hijri date only)
+        if (timingsToday["Maghrib"]) {
+          const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
+          if (now >= maghrib && hijriToday && hijriToday.day) {
+            let nextDay = parseInt(hijriToday.day) + 1;
+            let nextMonth = hijriToday.month.en;
+            let nextYear = parseInt(hijriToday.year);
+
+            // Handle month rollover (29–30 days)
+            if (nextDay > 30) {
+              nextDay = 1;
+              // We could optionally handle month rollover properly via a month list
+              // but AlAdhan will refresh at midnight anyway with correct next Hijri date.
             }
 
-            // 🌇 Adjust Hijri rollover after Maghrib
-            // 🌇 Adjust Hijri rollover after Maghrib (using API-based Hijri date only)
-            if (timingsToday["Maghrib"]) {
-                const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
-                if (now >= maghrib && hijriToday && hijriToday.day) {
-                    let nextDay = parseInt(hijriToday.day) + 1;
-                    let nextMonth = hijriToday.month.en;
-                    let nextYear = parseInt(hijriToday.year);
+            hijriDay = nextDay;
+            hijriMonth = nextMonth;
+            hijriYear = nextYear;
+          }
+        }
 
-                    // Handle month rollover (29–30 days)
-                    if (nextDay > 30) {
-                        nextDay = 1;
-                        // We could optionally handle month rollover properly via a month list
-                        // but AlAdhan will refresh at midnight anyway with correct next Hijri date.
-                    }
+        // 📜 Normalize month names for nicer display
+        const monthMap = {
+          Muharram: "Muḥarram",
+          Safar: "Ṣafar",
+          "Rabiʻ I": "Rabīʿ al-Awwal",
+          "Rabiʻ II": "Rabīʿ al-Thānī",
+          "Jumada I": "Jumādā al-Ūlā",
+          "Jumada II": "Jumādā al-Ākhirah",
+          Rajab: "Rajab",
+          Shaʻban: "Shaʿbān",
+          Ramadan: "Ramaḍān",
+          Shawwal: "Shawwāl",
+          "Dhuʻl-Qaʻdah": "Dhū al-Qaʿdah",
+          "Dhuʻl-Hijjah": "Dhū al-Ḥijjah",
+        };
 
-                    hijriDay = nextDay;
-                    hijriMonth = nextMonth;
-                    hijriYear = nextYear;
-                }
-            }
+        if (monthMap[hijriMonth]) hijriMonth = monthMap[hijriMonth];
 
-            // 📜 Normalize month names for nicer display
-            const monthMap = {
-                "Muharram": "Muḥarram",
-                "Safar": "Ṣafar",
-                "Rabiʻ I": "Rabīʿ al-Awwal",
-                "Rabiʻ II": "Rabīʿ al-Thānī",
-                "Jumada I": "Jumādā al-Ūlā",
-                "Jumada II": "Jumādā al-Ākhirah",
-                "Rajab": "Rajab",
-                "Shaʻban": "Shaʿbān",
-                "Ramadan": "Ramaḍān",
-                "Shawwal": "Shawwāl",
-                "Dhuʻl-Qaʻdah": "Dhū al-Qaʿdah",
-                "Dhuʻl-Hijjah": "Dhū al-Ḥijjah"
-            };
+        // 🧾 Combine nicely
+        const hijriText = `${hijriDay} ${hijriMonth} ${hijriYear} AH`;
 
-            if (monthMap[hijriMonth]) hijriMonth = monthMap[hijriMonth];
-
-            // 🧾 Combine nicely
-            const hijriText = `${hijriDay} ${hijriMonth} ${hijriYear} AH`;
-
-            document.getElementById('dateLine').innerHTML = `
+        document.getElementById("dateLine").innerHTML = `
     <span>${gregorian}</span>
     <span style="opacity:0.5;margin:0 8px;">|</span>
     <span id="hijriDate" style="color:var(--hijri-color);font-weight:500;">
       ${hijriText}
     </span>
   `;
+      }
+
+      function updateCountdown(upcoming, events) {
+        const nextMsg = document.getElementById("nextMessage");
+        const now = getNow();
+
+        if (!upcoming || (!upcoming.iqama && !upcoming.adhan)) {
+          nextMsg.innerHTML = "";
+          document.getElementById("countdown").textContent = "--:--:--";
+          return;
         }
 
-        function updateCountdown(upcoming, events) {
-            const nextMsg = document.getElementById("nextMessage");
-            const now = getNow();
+        const countdownString = (target) => {
+          if (!target) return "--:--:--";
+          let t = target;
+          if (t < now) t = new Date(t.getTime() + 24 * 3600 * 1000);
+          const diff = t - now;
+          const h = Math.floor(diff / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          return `${String(h).padStart(2, "0")}:${String(m).padStart(
+            2,
+            "0"
+          )}:${String(s).padStart(2, "0")}`;
+        };
 
-            if (!upcoming || (!upcoming.iqama && !upcoming.adhan)) {
-                nextMsg.innerHTML = "";
-                document.getElementById("countdown").textContent = "--:--:--";
-                return;
-            }
+        let message = "";
+        let countdownTarget = null;
+        let phaseClass = "phase-next"; // default
 
-            const countdownString = (target) => {
-                if (!target) return "--:--:--";
-                let t = target;
-                if (t < now) t = new Date(t.getTime() + 24 * 3600 * 1000);
-                const diff = t - now;
-                const h = Math.floor(diff / 3600000);
-                const m = Math.floor((diff % 3600000) / 60000);
-                const s = Math.floor((diff % 60000) / 1000);
-                return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-            };
+        if (upcoming.name === "Sunrise") {
+          message = `🌅 Sunrise is at ${formatTime12(
+            upcoming.adhan
+          )} — in ${countdownString(upcoming.adhan)}`;
+          countdownTarget = upcoming.adhan;
+          phaseClass = "phase-shuruq";
+        } else if (upcoming.name.startsWith("Jumuah")) {
+          message = `🕌 The next Jumuah (${
+            upcoming.name
+          }) is in ${countdownString(upcoming.adhan)}`;
+          countdownTarget = upcoming.adhan;
+          phaseClass = "phase-jumuah";
+        } else {
+          const adhan = upcoming.adhan;
+          const iqama = upcoming.iqama;
 
-            let message = "";
-            let countdownTarget = null;
-            let phaseClass = "phase-next"; // default
-
-            if (upcoming.name === "Sunrise") {
-                message = `🌅 Sunrise is at ${formatTime12(upcoming.adhan)} — in ${countdownString(upcoming.adhan)}`;
-                countdownTarget = upcoming.adhan;
-                phaseClass = "phase-shuruq";
-            } else if (upcoming.name.startsWith("Jumuah")) {
-                message = `🕌 The next Jumuah (${upcoming.name}) is in ${countdownString(upcoming.adhan)}`;
-                countdownTarget = upcoming.adhan;
-                phaseClass = "phase-jumuah";
+          if (now < adhan) {
+            message = `🕰️ ${upcoming.name} time begins in ${countdownString(
+              adhan
+            )}`;
+            countdownTarget = adhan;
+            phaseClass = "phase-before";
+          } else if (now >= adhan && now < iqama) {
+            message = `🙏 The Iqama for ${
+              upcoming.name
+            } will be in ${countdownString(iqama)}`;
+            countdownTarget = iqama;
+            phaseClass = "phase-iqama";
+          } else {
+            const currentIdx = events.findIndex(
+              (e) => e.name === upcoming.name
+            );
+            let nextEvent = events[currentIdx + 1];
+            if (!nextEvent) {
+              nextEvent = events.find((e) => e.name === "Fajr");
+              if (nextEvent) {
+                const nextFajrAdhan = new Date(
+                  nextEvent.adhan.getTime() + 24 * 3600 * 1000
+                );
+                message = `🕰️ Next prayer (Fajr) time begins in ${countdownString(
+                  nextFajrAdhan
+                )}`;
+                countdownTarget = nextFajrAdhan;
+                phaseClass = "phase-next";
+              }
             } else {
-                const adhan = upcoming.adhan;
-                const iqama = upcoming.iqama;
-
-                if (now < adhan) {
-                    message = `🕰️ ${upcoming.name} time begins in ${countdownString(adhan)}`;
-                    countdownTarget = adhan;
-                    phaseClass = "phase-before";
-                } else if (now >= adhan && now < iqama) {
-                    message = `🙏 The Iqama for ${upcoming.name} will be in ${countdownString(iqama)}`;
-                    countdownTarget = iqama;
-                    phaseClass = "phase-iqama";
-                } else {
-                    const currentIdx = events.findIndex(e => e.name === upcoming.name);
-                    let nextEvent = events[currentIdx + 1];
-                    if (!nextEvent) {
-                        nextEvent = events.find(e => e.name === "Fajr");
-                        if (nextEvent) {
-                            const nextFajrAdhan = new Date(nextEvent.adhan.getTime() + 24 * 3600 * 1000);
-                            message = `🕰️ Next prayer (Fajr) time begins in ${countdownString(nextFajrAdhan)}`;
-                            countdownTarget = nextFajrAdhan;
-                            phaseClass = "phase-next";
-                        }
-                    } else {
-                        message = `🕰️ Next prayer (${nextEvent.name}) time begins in ${countdownString(nextEvent.adhan)}`;
-                        countdownTarget = nextEvent.adhan;
-                        phaseClass = "phase-next";
-                    }
-                }
+              message = `🕰️ Next prayer (${
+                nextEvent.name
+              }) time begins in ${countdownString(nextEvent.adhan)}`;
+              countdownTarget = nextEvent.adhan;
+              phaseClass = "phase-next";
             }
-
-            // Determine current phase key (for comparison)
-            const currentPhaseKey = phaseClass + "-" + upcoming.name;
-
-            // If the phase changed (not just countdown ticking), fade
-            if (nextMsg.dataset.phase !== currentPhaseKey) {
-                nextMsg.classList.add("fade-out");
-                setTimeout(() => {
-                    nextMsg.innerHTML = message;
-                    nextMsg.className = "";
-                    nextMsg.classList.add(phaseClass);
-                    nextMsg.dataset.phase = currentPhaseKey;
-                }, 300);
-                setTimeout(() => nextMsg.classList.remove("fade-out"), 400);
-            } else {
-                // Same phase — just update countdown text without fading
-                nextMsg.innerHTML = message;
-            }
+          }
         }
 
-        fetchTimings();
-        setInterval(fetchTimings, 15 * 60 * 1000);
-        setInterval(() => renderGrid(), 1000);
+        // Determine current phase key (for comparison)
+        const currentPhaseKey = phaseClass + "-" + upcoming.name;
 
-        function updateLiveClock() {
-            const now = getNow();
-            const timeString = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
-            document.getElementById('liveClock').textContent = timeString;
+        // If the phase changed (not just countdown ticking), fade
+        if (nextMsg.dataset.phase !== currentPhaseKey) {
+          nextMsg.classList.add("fade-out");
+          setTimeout(() => {
+            nextMsg.innerHTML = message;
+            nextMsg.className = "";
+            nextMsg.classList.add(phaseClass);
+            nextMsg.dataset.phase = currentPhaseKey;
+          }, 300);
+          setTimeout(() => nextMsg.classList.remove("fade-out"), 400);
+        } else {
+          // Same phase — just update countdown text without fading
+          nextMsg.innerHTML = message;
         }
-        updateLiveClock();
-        setInterval(updateLiveClock, 1000);
-        setInterval(updateDateLine, 60000); // update every minute
-        const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-        setTimeout(() => {
-            console.log("Weekly auto-refresh triggered");
-            location.reload(true);
-        }, WEEK_MS);
+      }
 
-        // 🌙 Auto theme switching (and manual toggle)
-        function applyTheme(mode) {
-            if (mode === "dark") {
-                document.body.classList.add("dark");
-            } else {
-                document.body.classList.remove("dark");
-            }
-            localStorage.setItem("theme", mode);
+      fetchTimings();
+      setInterval(fetchTimings, 15 * 60 * 1000);
+      setInterval(() => renderGrid(), 1000);
+
+      function updateLiveClock() {
+        const now = getNow();
+        const timeString = now.toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        document.getElementById("liveClock").textContent = timeString;
+      }
+      updateLiveClock();
+      setInterval(updateLiveClock, 1000);
+      setInterval(updateDateLine, 60000); // update every minute
+      const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+      setTimeout(() => {
+        console.log("Weekly auto-refresh triggered");
+        location.reload(true);
+      }, WEEK_MS);
+
+      // 🌙 Auto theme switching (and manual toggle)
+      function applyTheme(mode) {
+        if (mode === "dark") {
+          document.body.classList.add("dark");
+        } else {
+          document.body.classList.remove("dark");
         }
+        localStorage.setItem("theme", mode);
+      }
 
-        // Manual toggle handler
-        // document.getElementById("themeToggle").addEventListener("click", () => {
-        //     const current = document.body.classList.contains("dark") ? "dark" : "light";
-        //     const newMode = current === "dark" ? "light" : "dark";
-        //     applyTheme(newMode);
-        // });
+      // Manual toggle handler
+      // document.getElementById("themeToggle").addEventListener("click", () => {
+      //     const current = document.body.classList.contains("dark") ? "dark" : "light";
+      //     const newMode = current === "dark" ? "light" : "dark";
+      //     applyTheme(newMode);
+      // });
 
-        // Automatic mode based on prayer times
-        function autoThemeBasedOnSun() {
-            if (!timingsToday["Fajr"] || !timingsToday["Maghrib"]) return;
+      // Automatic mode based on prayer times
+      function autoThemeBasedOnSun() {
+        if (!timingsToday["Fajr"] || !timingsToday["Maghrib"]) return;
 
-            // Always evaluate everything in the same timezone (Eastern)
-            const TIMEZONE = "America/New_York";
+        // Always evaluate everything in the same timezone (Eastern)
+        const TIMEZONE = "America/New_York";
 
-            const now = getNow();
-            const fajr = parseTimeToDate(timingsToday["Fajr"]);
-            const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
+        const now = getNow();
+        const fajr = parseTimeToDate(timingsToday["Fajr"]);
+        const maghrib = parseTimeToDate(timingsToday["Maghrib"]);
 
-            // If current time is after Maghrib or before Fajr → dark mode
-            if (now < fajr || now >= maghrib) {
-                applyTheme("dark");
-            } else {
-                applyTheme("light");
-            }
+        // If current time is after Maghrib or before Fajr → dark mode
+        if (now < fajr || now >= maghrib) {
+          applyTheme("dark");
+        } else {
+          applyTheme("light");
         }
+      }
 
+      const logo = document.getElementById("mosqueLogo");
 
-        // Re-check automatically every minute
-        setInterval(autoThemeBasedOnSun, 60000);
+      if (logo) {
+        logo.style.cursor = "pointer"; // visual hint
+
+        logo.addEventListener("click", () => {
+          toggleFlyer();
+        });
+      }
+
+      // Re-check automatically every minute
+      setInterval(autoThemeBasedOnSun, 60000);
     </script>
-
-</body>
-
+  </body>
 </html>
