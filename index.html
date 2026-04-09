@@ -209,14 +209,12 @@
             z-index: 999999;
 
             display: flex;
-            /* keep it mounted */
             align-items: center;
             justify-content: center;
 
-            background: black;
+            background: rgba(0, 0, 0, 0.9);
             opacity: 0;
             pointer-events: none;
-            /* so clicks go to the board when hidden */
             transition: opacity 600ms ease;
         }
 
@@ -225,10 +223,20 @@
             pointer-events: auto;
         }
 
-        #flyerOverlay img {
-            max-width: 100vw;
-            max-height: 100vh;
+        .flyer-slide {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
+            object-position: center;
+
+            opacity: 0;
+            transition: opacity 900ms ease-in-out;
+        }
+
+        .flyer-slide.active {
+            opacity: 1;
         }
 
         footer {
@@ -237,6 +245,49 @@
             opacity: 0.8;
             font-size: 0.9rem;
             color: var(--subtext-color);
+        }
+
+        #ytPlayerWrap {
+            position: fixed;
+            left: 16px;
+            bottom: 16px;
+            z-index: 1000;
+
+            width: clamp(260px, 30vw, 420px);
+            aspect-ratio: 16 / 9;
+
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px var(--shadow-color);
+            background: #000;
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transition: opacity 250ms ease, visibility 250ms ease;
+        }
+
+        #ytPlayerWrap.inactive {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        #ytPlayer {
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        body.dark #ytPlayerWrap {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+        }
+
+        @media (max-width: 900px) {
+            #ytPlayerWrap {
+                width: 240px;
+                left: 12px;
+                bottom: 12px;
+            }
         }
 
         @media (max-width: 900px) {
@@ -310,78 +361,243 @@
                     <div>11:30 AM (Hanafi)</div>
                     <div>12:30 PM (Hanafi)</div>
                     <div>1:30 PM (Jaffari)</div>
-                    <br />
-                    <div>
-                        📢 Thursday Maghrib prayer will be downstairs in the event hall
-                    </div>
                 </div>
             </div>
         </main>
 
         <div id="flyerOverlay" aria-hidden="true">
-            <img id="flyerImg" src="./assets/flyer.jpeg" alt="Event flyer" />
+            <img id="flyerImgA" class="flyer-slide active" alt="Flyer slide A" />
+            <img id="flyerImgB" class="flyer-slide" alt="Flyer slide B" />
         </div>
 
         <footer>Auto-updating prayer board — configured for this masjid.</footer>
     </div>
 
+    <div id="ytPlayerWrap" class="inactive" aria-label="Makkah live stream">
+        <iframe id="ytPlayer" data-src="https://www.youtube.com/embed/Cm1v4bteXbI?autoplay=1&mute=1&controls=1&loop=1&playlist=Cm1v4bteXbI&modestbranding=1&rel=0"
+            src="about:blank" title="Makkah live audio/video"
+            allow="autoplay; encrypted-media; picture-in-picture"
+            referrerpolicy="strict-origin-when-cross-origin">
+        </iframe>
+    </div>
+
     <script>
+        // ===== FLYER LOGIC
+
         // ===== CONFIG =====
-        const SECRET_CODE = "flyer123"; // <-- change this
-        const SHOW_EVERY_MS = 30_000; // 30s (use 60_000 for 1 minute)
-        const SHOW_FOR_MS = 10_000; // visible duration
-        const FLYER_URL = "./assets/flyer.jpeg";
+        const SECRET_CODE = "flyer123";
+        const SECONDS_PER_SLIDE = 7;
+        const BOARD_SECONDS = 14;
+        const FETCH_TIMEOUT_MS = 8000;
+        const WIDGET_URL = "https://themasjidapp.org/129307/slides/widget";
+        const STORAGE_KEY = "flyerEnabled";
 
         // ===== STATE =====
-        const STORAGE_KEY = "flyerEnabled";
         let flyerEnabled = localStorage.getItem(STORAGE_KEY) === "true";
+        let flyerSlides = [];
+        let flyerCycleTimer = null;
+        let overlayHideTimer = null;
 
         const overlay = document.getElementById("flyerOverlay");
-        const img = document.getElementById("flyerImg");
-        img.src = FLYER_URL;
+        const flyerImgA = document.getElementById("flyerImgA");
+        const flyerImgB = document.getElementById("flyerImgB");
+        const ytPlayerWrap = document.getElementById("ytPlayerWrap");
+        const ytPlayer = document.getElementById("ytPlayer");
 
-        // preload (prevents first-time flicker)
-        const preload = new Image();
-        preload.src = FLYER_URL;
+        let activeFlyerImg = flyerImgA;
+        let inactiveFlyerImg = flyerImgB;
 
-        function showFlyer() {
-            if (!flyerEnabled) return;
+        function swapFlyerImages(nextSrc) {
+            inactiveFlyerImg.src = nextSrc;
 
-            overlay.classList.add("show");
+            requestAnimationFrame(() => {
+                inactiveFlyerImg.classList.add("active");
+                activeFlyerImg.classList.remove("active");
 
-            setTimeout(() => {
-                overlay.classList.remove("show");
-            }, SHOW_FOR_MS);
+                const temp = activeFlyerImg;
+                activeFlyerImg = inactiveFlyerImg;
+                inactiveFlyerImg = temp;
+            });
         }
 
-        // run on a loop
-        setInterval(showFlyer, SHOW_EVERY_MS);
+        // Convert widget image URL to the exact size variant their widget is using
+        function toWidgetDisplayUrl(url) {
+            // e.g. /default -> /1080rect2x
+            return url.replace(/\/default$/, "/1080rect2x");
+        }
 
-        // ===== SECRET CODE LISTENER =====
-        let buffer = "";
-        let bufferTimer = null;
+        async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-        function resetBufferSoon() {
-            clearTimeout(bufferTimer);
-            bufferTimer = setTimeout(() => (buffer = ""), 2000); // clear if user pauses typing
+            try {
+                return await fetch(url, {
+                    ...options,
+                    signal: controller.signal,
+                });
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        async function loadFlyerSlides() {
+            try {
+                const res = await fetchWithTimeout(WIDGET_URL, { cache: "no-store" });
+                const html = await res.text();
+
+                const match = html.match(
+                    /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/
+                );
+
+                if (!match) {
+                    console.warn("Could not find __NEXT_DATA__ in widget HTML");
+                    return;
+                }
+
+                const data = JSON.parse(match[1]);
+                const slides = data?.props?.pageProps?.masjid?.slides || [];
+
+                flyerSlides = slides
+                    .filter(
+                        (slide) =>
+                            slide.type === "photo" &&
+                            Array.isArray(slide.slideshowIds) &&
+                            slide.slideshowIds.includes("WEBSITE_WIDGET") &&
+                            slide.url
+                    )
+                    .map((slide) => toWidgetDisplayUrl(slide.url));
+
+                console.log("Loaded flyer slides:", flyerSlides);
+            } catch (err) {
+                console.error("Failed to load flyer slides:", err);
+            }
+        }
+
+        function syncYtPlayerState() {
+            if (!ytPlayerWrap || !ytPlayer) return;
+
+            const targetSrc = ytPlayer.dataset.src || "";
+
+            if (flyerEnabled) {
+                ytPlayerWrap.classList.remove("inactive");
+                if (ytPlayer.src !== targetSrc) {
+                    ytPlayer.src = targetSrc;
+                }
+            } else {
+                ytPlayerWrap.classList.add("inactive");
+                if (ytPlayer.src !== "about:blank") {
+                    ytPlayer.src = "about:blank";
+                }
+            }
+        }
+
+        function getFlyerDurationMs() {
+            return flyerSlides.length * SECONDS_PER_SLIDE * 1000;
+        }
+
+        function getCycleDurationMs() {
+            return getFlyerDurationMs() + BOARD_SECONDS * 1000;
+        }
+
+        function clearFlyerTimers() {
+            if (flyerCycleTimer) clearInterval(flyerCycleTimer);
+            if (overlayHideTimer) clearTimeout(overlayHideTimer);
+            flyerCycleTimer = null;
+            overlayHideTimer = null;
+        }
+
+        function showFlyerSequence() {
+            if (!flyerEnabled || flyerSlides.length === 0) return;
+
+            let currentIndex = 0;
+
+            // Fully reset layers
+            resetFlyerLayers(flyerSlides[currentIndex]);
+
+            // First fade in the black overlay itself
+            overlay.classList.add("show");
+
+            // Then, on the next frame, reveal the first image
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    activeFlyerImg.classList.add("active");
+                });
+            });
+
+            const slideTimer = setInterval(() => {
+                currentIndex += 1;
+
+                if (currentIndex >= flyerSlides.length) {
+                    clearInterval(slideTimer);
+                    overlay.classList.remove("show");
+
+                    // Clean up both layers after fade-out begins
+                    flyerImgA.classList.remove("active");
+                    flyerImgB.classList.remove("active");
+                    flyerImgA.removeAttribute("src");
+                    flyerImgB.removeAttribute("src");
+                    return;
+                }
+
+                swapFlyerImages(flyerSlides[currentIndex]);
+            }, SECONDS_PER_SLIDE * 1000);
+
+            overlayHideTimer = setTimeout(() => {
+                clearInterval(slideTimer);
+                overlay.classList.remove("show");
+
+                // Full cleanup so no stale slide survives into next cycle
+                flyerImgA.classList.remove("active");
+                flyerImgB.classList.remove("active");
+                flyerImgA.removeAttribute("src");
+                flyerImgB.removeAttribute("src");
+            }, getFlyerDurationMs());
+        }
+
+        function resetFlyerLayers(firstSrc) {
+            // Reset both layers completely
+            flyerImgA.classList.remove("active");
+            flyerImgB.classList.remove("active");
+
+            flyerImgA.removeAttribute("src");
+            flyerImgB.removeAttribute("src");
+
+            // Set first image on A only, but do NOT activate it yet
+            flyerImgA.src = firstSrc;
+
+            activeFlyerImg = flyerImgA;
+            inactiveFlyerImg = flyerImgB;
+        }
+
+        function startFlyerLoop() {
+            clearFlyerTimers();
+
+            if (!flyerEnabled || flyerSlides.length === 0) return;
+
+            // show immediately
+            showFlyerSequence();
+
+            // then repeat after full cycle (slides + board time)
+            flyerCycleTimer = setInterval(() => {
+                showFlyerSequence();
+            }, getCycleDurationMs());
         }
 
         function toggleFlyer() {
             flyerEnabled = !flyerEnabled;
             localStorage.setItem(STORAGE_KEY, String(flyerEnabled));
-            buffer = "";
 
-            // optional: quick visual confirmation without showing UI chrome
             console.log(`Flyer rotator: ${flyerEnabled ? "ENABLED" : "DISABLED"}`);
 
-            // if disabling while flyer is showing, hide it immediately
             if (!flyerEnabled) {
+                clearFlyerTimers();
                 overlay.classList.remove("show");
                 overlay.setAttribute("aria-hidden", "true");
             } else {
-                // optionally show it once immediately when enabled
-                showFlyer();
+                startFlyerLoop();
             }
+
+            syncYtPlayerState();
         }
 
         window.addEventListener("keydown", (e) => {
@@ -400,6 +616,15 @@
                 toggleFlyer();
             }
         });
+
+        // ====== Prayer Time LOGIC
+        const PRAYERS_WIDGET_URL = "https://themasjidapp.org/129307/prayers";
+        let prayersWidgetData = null;
+        let prayersWidgetIqamas = {};
+        let prayersWidgetJumuahs = [];
+        let prayersWidgetTimezone = "America/New_York";
+        let prayersWidgetHijriOffset = 0;
+
         const LAT = 38.912681; // Sterling, VA latitude
         const LON = -77.464279; // Sterling, VA longitude
         const MOSQUE_NAME = "Crescent Islamic Center";
@@ -422,20 +647,27 @@
             return TEST_TIME ? new Date(TEST_TIME) : new Date();
         }
 
+        function refreshPrayerBoardUi() {
+            if (!timingsToday["Fajr"]) return;
+
+            updateDateLine();
+            computeIqamaTimes();
+            renderGrid();
+            autoThemeBasedOnSun();
+        }
+
         async function fetchTimings() {
             try {
                 const today = getNow();
                 const timestamp = Math.floor(today.getTime() / 1000);
                 const url = `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${LAT}&longitude=${LON}&method=${calcMethod}`;
-                const res = await fetch(url);
+                const res = await fetchWithTimeout(url, { cache: "no-store" });
                 const json = await res.json();
+
                 if (json && json.data && json.data.timings) {
                     timingsToday = json.data.timings;
                     hijriToday = json.data.date.hijri;
-                    updateDateLine();
-                    computeIqamaTimes();
-                    renderGrid();
-                    autoThemeBasedOnSun();
+                    refreshPrayerBoardUi();
                 } else {
                     console.error("Bad timings response", json);
                 }
@@ -460,102 +692,91 @@
             return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
         }
 
-        const iqamaChanges = {
-            "2025-10-01": {
-                Fajr: "06:15",
-                Dhuhr: "13:30",
-                Asr: "16:45",
-                Isha: "20:30",
-            },
-            "2025-10-05": {
-                Fajr: "06:30",
-                Dhuhr: "13:30",
-                Asr: "16:45",
-                Isha: "20:15",
-            },
-            "2025-10-12": {
-                Fajr: "06:30",
-                Dhuhr: "13:30",
-                Asr: "16:30",
-                Isha: "20:00",
-            },
-            "2025-10-26": {
-                Fajr: "06:30",
-                Dhuhr: "13:30",
-                Asr: "16:15",
-                Isha: "20:00",
-            },
-            "2025-11-02": {
-                Fajr: "05:45",
-                Dhuhr: "13:30",
-                Asr: "15:00",
-                Isha: "18:45",
-            },
-            "2025-11-09": {
-                Fajr: "06:00",
-                Dhuhr: "13:30",
-                Asr: "15:00",
-                Isha: "18:45",
-            },
-            "2025-11-23": {
-                Fajr: "06:15",
-                Dhuhr: "13:30",
-                Asr: "15:00",
-                Isha: "18:45",
-            },
-            "2026-01-22": {
-                Fajr: "06:15",
-                Dhuhr: "13:30",
-                Asr: "15:00",
-                Isha: "19:00",
-            },
-        };
+        function getDayOfYear(date) {
+            const start = new Date(date.getFullYear(), 0, 0);
+            const diff = date - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            return Math.floor(diff / oneDay);
+        }
 
-        // Compute iqama times (static)
+
         function computeIqamaTimes() {
             const now = getNow();
-            const todayKey = now.toISOString().split("T")[0];
+            const dayOfYear = String(getDayOfYear(now));
+            const entry = prayersWidgetIqamas[dayOfYear];
 
-            // Find the most recent date ≤ today in the schedule
-            const applicableDate = Object.keys(iqamaChanges)
-                .filter((d) => d <= todayKey)
-                .sort()
-                .pop(); // last (most recent)
-
-            const entry = iqamaChanges[applicableDate];
             if (!entry) {
-                console.warn(
-                    "No iqama schedule found for today or earlier!",
-                    todayKey
-                );
+                console.warn("No prayers-widget iqama entry for day-of-year:", dayOfYear);
+                iqamaTimes = {};
                 return;
             }
 
-            // Build the Date objects for today
-            const fajrIqama = parseHMToDate(entry.Fajr);
-            const dhuhrIqama = parseHMToDate(entry.Dhuhr);
-            const asrIqama = parseHMToDate(entry.Asr);
-            const ishaIqama = parseHMToDate(entry.Isha);
-
-            // Maghrib = adhan + 7 minutes
-            const maghribAdhan = parseTimeToDate(timingsToday["Maghrib"]);
-            const maghribIqama = new Date(maghribAdhan.getTime() + 7 * 60000);
+            const maghribIqama = entry.maghrib ? parseWidgetTimeToDate(entry.maghrib) : null;
+            const ishaIqama = entry.isha ? parseWidgetTimeToDate(entry.isha) : null;
 
             iqamaTimes = {
-                // Fajr: fajrIqama,
-                // Dhuhr: dhuhrIqama,
-                // Asr: asrIqama,
                 Maghrib: maghribIqama,
-                Isha: ishaIqama,
+                Isha: ishaIqama
             };
         }
 
         // helper
-        function parseHMToDate(hm) {
-            const [h, m] = hm.split(":").map(Number);
-            const d = getNow();
-            d.setHours(h, m, 0, 0);
+        function parseWidgetTimeToDate(timeStr) {
+            if (!timeStr) return null;
+
+            const [time, meridiem] = timeStr.trim().split(" ");
+            let [hours, minutes] = time.split(":").map(Number);
+
+            if (meridiem.toUpperCase() === "PM" && hours !== 12) hours += 12;
+            if (meridiem.toUpperCase() === "AM" && hours === 12) hours = 0;
+
+            const d = new Date(getNow().getTime());
+            d.setHours(hours, minutes, 0, 0);
             return d;
+        }
+
+        async function loadPrayerWidgetData() {
+            try {
+                const res = await fetchWithTimeout(PRAYERS_WIDGET_URL, { cache: "no-store" });
+                const html = await res.text();
+
+                const match = html.match(
+                    /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/
+                );
+
+                if (!match) {
+                    console.warn("Could not find __NEXT_DATA__ in prayers widget HTML");
+                    return;
+                }
+
+                const data = JSON.parse(match[1]);
+                const masjid = data?.props?.pageProps?.masjid;
+
+                if (!masjid) {
+                    console.warn("Prayers widget data missing masjid object");
+                    return;
+                }
+
+                prayersWidgetData = data;
+                prayersWidgetIqamas = masjid.iqamas || {};
+                prayersWidgetTimezone = masjid.timezone || "America/New_York";
+                prayersWidgetHijriOffset = masjid.hijriOffset || 0;
+
+                prayersWidgetJumuahs = (masjid.events || [])
+                    .filter((e) => e.isJuma)
+                    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+                console.log("Loaded prayers widget data", {
+                    timezone: prayersWidgetTimezone,
+                    hijriOffset: prayersWidgetHijriOffset,
+                    iqamaCount: Object.keys(prayersWidgetIqamas).length,
+                    jumuahCount: prayersWidgetJumuahs.length,
+                });
+
+                refreshPrayerBoardUi();
+            } catch (err) {
+                console.error("Failed to load prayers widget data:", err);
+            }
         }
 
         function setSpecificTime(hours24, minutes) {
@@ -568,66 +789,56 @@
             const grid = document.getElementById("prayerGrid");
             grid.innerHTML = "";
 
+            if (!timingsToday["Fajr"] || !timingsToday["Sunrise"] || !timingsToday["Maghrib"]) {
+                grid.innerHTML = `
+                    <div class="prayer" style="grid-column: 1 / -1;">
+                        Loading prayer times…
+                    </div>
+                `;
+                return;
+            }
+
             const now = getNow();
             const day = now.getDay(); // 0=Sun ... 5=Fri
 
-            // Build the prayer list including Shuruq
             let prayers = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
 
-            // 🕌 Show Jumuah cards from Maghrib (Thursday) → until Maghrib (Friday)
+            // Show Jumuah cards from Thursday Maghrib until Friday Maghrib
             const maghribToday = parseTimeToDate(timingsToday["Maghrib"]);
             let showJumuah = false;
 
-            // If it's Friday (day 5)
             if (day === 5) {
-                const now = getNow();
-                // If it's still before Maghrib, show Jumuah
                 if (now < maghribToday) showJumuah = true;
-            }
-            // If it's Thursday (day 4)
-            else if (day === 4) {
-                const now = getNow();
-                // If it's after Maghrib, show Jumuah (prepare board for next day)
+            } else if (day === 4) {
                 if (now >= maghribToday) showJumuah = true;
             }
 
             if (showJumuah) {
-                prayers = [
-                    "Fajr",
-                    "Sunrise",
-                    "Jumuah 1",
-                    "Jumuah 2",
-                    "Jumuah 3",
-                    "Asr",
-                    "Maghrib",
-                    "Isha",
-                ];
+                prayers = ["Fajr", "Sunrise", "Jumuah 1", "Jumuah 2", "Jumuah 3", "Asr", "Maghrib", "Isha"];
             }
 
             const ann = document.getElementById("announcements");
-            if (showJumuah) {
-                if (ann) ann.style.display = "none";
-            } else {
-                if (ann) ann.style.display = "block";
+            if (ann) {
+                ann.style.display = showJumuah ? "none" : "block";
             }
 
             const nowMs = now.getTime();
             const events = [];
 
-            // Build event list with actual Date objects
             for (const p of prayers) {
                 if (p.startsWith("Jumuah")) {
-                    // Three fixed Friday slots
-                    const index = parseInt(p.split(" ")[1]);
-                    const times = [
-                        { hour: 11, minute: 30, madhhab: "Hanafi" },
-                        { hour: 12, minute: 30, madhhab: "Hanafi" },
-                        { hour: 13, minute: 30, madhhab: "Jaffari" },
-                    ];
-                    const info = times[index - 1];
-                    const d = getNow();
-                    d.setHours(info.hour, info.minute, 0, 0);
-                    events.push({ name: p, adhan: d, madhhab: info.madhhab });
+                    const index = parseInt(p.split(" ")[1], 10) - 1;
+                    const info = prayersWidgetJumuahs[index];
+
+                    if (!info) continue;
+
+                    const d = parseWidgetTimeToDate(info.timeDesc);
+
+                    events.push({
+                        name: p,
+                        adhan: d,
+                        madhhab: info.desc || ""
+                    });
                 } else if (p === "Sunrise") {
                     const t = parseTimeToDate(timingsToday["Sunrise"]);
                     events.push({ name: "Sunrise", adhan: t });
@@ -638,10 +849,8 @@
                 }
             }
 
-            // Determine next upcoming event
             let upcoming = events
                 .filter((e) => {
-                    // If it has iqama, use that; otherwise fall back to adhan (e.g. Shuruq, Jumuah)
                     const t = e.iqama || e.adhan;
                     return t && t.getTime() > nowMs;
                 })
@@ -651,7 +860,6 @@
                     return ta - tb;
                 })[0];
 
-            // If no upcoming events today, use tomorrow's Fajr
             if (!upcoming) {
                 const fajrEvent = events.find((e) => e.name === "Fajr");
                 if (fajrEvent) {
@@ -665,35 +873,33 @@
                 }
             }
 
-            // Create all prayer cards
             for (const e of events) {
                 const adhanStr = e.adhan ? formatTime12(e.adhan) : "--:--";
                 const div = document.createElement("div");
 
-                // Base card classes
                 div.className = "prayer";
-                if (upcoming && e.name === upcoming.name)
+                if (upcoming && e.name === upcoming.name) {
                     div.classList.add("current");
+                }
 
-                // Build card content
                 if (e.name.startsWith("Jumuah")) {
                     div.innerHTML = `
-        <div class="name">${e.name}</div>
-        <div class="time">${adhanStr}</div>
-        <div class="iqama">${e.madhhab}</div>
-      `;
+                        <div class="name">${e.name}</div>
+                        <div class="time">${adhanStr}</div>
+                        <div class="iqama">${e.madhhab}</div>
+                    `;
                 } else if (e.name === "Sunrise") {
                     div.innerHTML = `
-        <div class="name">Shuruq</div>
-        <div class="time">${adhanStr}</div>
-      `;
+                        <div class="name">Shuruq</div>
+                        <div class="time">${adhanStr}</div>
+                    `;
                 } else {
                     const iqStr = e.iqama ? formatTime12(e.iqama) : null;
                     div.innerHTML = `
-    <div class="name">${e.name}</div>
-    <div class="time">${adhanStr}</div>
-    ${iqStr ? `<div class="iqama">Iqama: ${iqStr}</div>` : ""}
-  `;
+                        <div class="name">${e.name}</div>
+                        <div class="time">${adhanStr}</div>
+                        ${iqStr ? `<div class="iqama">Iqama: ${iqStr}</div>` : ""}
+                    `;
                 }
 
                 grid.appendChild(div);
@@ -794,7 +1000,6 @@
 
             if (!upcoming || (!upcoming.iqama && !upcoming.adhan)) {
                 nextMsg.innerHTML = "";
-                document.getElementById("countdown").textContent = "--:--:--";
                 return;
             }
 
@@ -887,9 +1092,19 @@
             }
         }
 
-        fetchTimings();
-        setInterval(fetchTimings, 15 * 60 * 1000);
-        setInterval(() => renderGrid(), 1000);
+        async function initializePrayerBoard() {
+            renderGrid();
+
+            const results = await Promise.allSettled([
+                loadPrayerWidgetData(),
+                fetchTimings(),
+            ]);
+
+            const failures = results.filter((result) => result.status === "rejected");
+            if (failures.length > 0) {
+                console.warn("Prayer board initialization completed with fetch failures.", failures);
+            }
+        }
 
         function updateLiveClock() {
             const now = getNow();
@@ -901,8 +1116,12 @@
             document.getElementById("liveClock").textContent = timeString;
         }
         updateLiveClock();
+        syncYtPlayerState();
+        initializePrayerBoard();
         setInterval(updateLiveClock, 1000);
         setInterval(updateDateLine, 60000); // update every minute
+        setInterval(fetchTimings, 5 * 60 * 1000);
+        setInterval(loadPrayerWidgetData, 30 * 60 * 1000);
         const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
         setTimeout(() => {
             console.log("Weekly auto-refresh triggered");
@@ -957,6 +1176,16 @@
 
         // Re-check automatically every minute
         setInterval(autoThemeBasedOnSun, 60000);
+        (async function initFlyers() {
+            await loadFlyerSlides();
+
+            // optional: refresh slide list every 10 minutes so changes on MasjidApp propagate
+            setInterval(loadFlyerSlides, 10 * 60 * 1000);
+
+            if (flyerEnabled) {
+                startFlyerLoop();
+            }
+        })();
     </script>
 </body>
 
